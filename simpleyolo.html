@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>YOLO Person Detection</title>
+    <style>
+        .camera-container {
+            position: relative;
+            width: 640px;
+            height: 480px;
+            margin: 0 auto;
+        }
+
+        #webcam, #canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: contain; /* Changed from cover to contain */
+        }
+
+        .controls {
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="controls">
+        <select id="modelSelector">
+            <option value="yolov8">YOLOv8</option>
+            <option value="yolov11">YOLOv11</option>
+        </select>
+        <button id="startBtn">Start Detection</button>
+    </div>
+    <div id="loadingIndicator" style="display: none;">Loading model...</div>
+
+    <div class="camera-container">
+        <video id="webcam" autoplay playsinline></video>
+        <canvas id="canvas"></canvas>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.15.0"></script>
+    <script>
+        // Configure TensorFlow.js for better performance
+        tf.env().set('WEBGL_PACK', true);
+        tf.env().set('WEBGL_FLUSH_THRESHOLD', 0);
+        tf.env().set('WEBGL_FORCE_F16_TEXTURES', true);
+        tf.env().set('WEBGL_CPU_FORWARD', false);
+        tf.env().set('WEBGL_SIZE_UPLOAD_UNIFORM', 4);
+        let model = null;
+        let isRunning = false;
+        
+        const video = document.getElementById('webcam');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const modelSelector = document.getElementById('modelSelector');
+        const startBtn = document.getElementById('startBtn');
+
+        // Initialize webcam
+        async function setupCamera() {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: { width: 640, height: 640 },
+                audio: false
+            });
+            video.srcObject = stream;
+            return new Promise((resolve) => {
+                video.onloadedmetadata = () => {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    resolve(video);
+                };
+            });
+        }
+
+        async function loadModel(modelType) {
+            try {
+                const loadingIndicator = document.getElementById('loadingIndicator');
+                loadingIndicator.style.display = 'block';
+                
+                if (model) {
+                    model.dispose();
+                    model = null;
+                }
+                
+                const modelPath = `./${modelType}n_web_model/model.json`;
+                model = await tf.loadGraphModel(modelPath);
+                console.log(`${modelType} model loaded`);
+                
+                loadingIndicator.style.display = 'none';
+                return model;
+            } catch (error) {
+                console.error('Error loading model:', error);
+                loadingIndicator.style.display = 'none';
+                throw error;
+            }
+        }
+
+        // Replace the processDetections function
+
+        async function processDetections(predictions) {
+            if (!predictions || !predictions.arraySync || predictions.arraySync().length === 0) {
+                return;
+            }
+
+            const boxes = await predictions.arraySync();
+            const threshold = 0.3;
+            
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.strokeStyle = '#00FF00';
+            ctx.lineWidth = 2;
+            
+            const detections = boxes[0];
+            const videoRect = video.getBoundingClientRect();
+            const displayWidth = videoRect.width;
+            const displayHeight = videoRect.height;
+
+
+            for (let i = 0; i < detections.length; i++) {
+                const detection = detections[i];
+                const [x, y, w, h, ...classes] = detection;
+                const confidence = classes[0];
+                
+                if (confidence > threshold) {
+                    // Apply aspect ratio correction and scaling
+                    const boxX = x * displayWidth;
+                    const boxY = y * displayHeight;
+                    const boxW = w * displayWidth;
+                    const boxH = h * displayHeight;
+                    
+                    // Draw bounding box with corrected coordinates
+                    ctx.beginPath();
+                    ctx.strokeRect(
+                        boxX - boxW/2,
+                        boxY - boxH/2,
+                        boxW,
+                        boxH
+                    );
+                    
+                    // Add confidence score
+                    ctx.fillStyle = '#00FF00';
+                    ctx.font = '12px Arial';
+                    ctx.fillText(
+                        `${Math.round(confidence * 100)}%`,
+                        boxX - boxW/2,
+                        boxY - boxH/2 - 5
+                    );
+                }
+            }
+        }
+
+        // Sigmoid activation function
+        function sigmoid(x) {
+            return 1 / (1 + Math.exp(-x));
+        }
+
+        async function detectPerson() {
+            if (!isRunning || !model) return;
+
+            try {
+                await tf.setBackend('webgl');
+                // Process single frame
+                const tensor = tf.tidy(() => {
+                    // Optimize image preprocessing
+                    const img = tf.browser.fromPixels(video);
+                    // Maintain aspect ratio while resizing
+                    const [h, w] = img.shape.slice(0, 2);
+                    const scale = Math.min(640/w, 640/h);
+                    const newH = Math.round(h * scale);
+                    const newW = Math.round(w * scale);
+                    
+                    return img.resizeBilinear([newH, newW])
+                            .pad([[0, 640 - newH], [0, 640 - newW], [0, 0]])
+                            .expandDims(0)
+                            .div(255.0);
+                });
+
+                // Run inference with await to ensure proper timing
+                const predictions = await model.execute(tensor);
+                await processDetections(predictions);
+
+                // Cleanup tensors
+                tensor.dispose();
+
+                // Use requestAnimationFrame for optimal timing
+                if (isRunning) {
+                    requestAnimationFrame(detectPerson);
+        }
+            } catch (error) {
+                console.error('Detection error:', error);
+                isRunning = false;
+            }
+        }
+
+        // Event handlers
+        startBtn.addEventListener('click', async () => {
+            if (isRunning) {
+                isRunning = false;
+                startBtn.textContent = 'Start Detection';
+                if (model) {
+                    model.dispose();
+                    model = null;
+                }
+            } else {
+                try {
+                    await loadModel(modelSelector.value);
+                    isRunning = true;
+                    startBtn.textContent = 'Stop Detection';
+                    detectPerson();
+                } catch (error) {
+                    console.error('Failed to start detection:', error);
+                }
+            }
+        });
+
+        // Initialize
+        setupCamera();
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            if (model) {
+                model.dispose();
+            }
+        });
+    </script>
+</body>
+</html>

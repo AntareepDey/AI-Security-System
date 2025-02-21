@@ -247,40 +247,73 @@
                     console.log('Raw YOLO output:', predictions);
                     console.log('Output shape:', predictions.shape);
             
-                    const transposed = tf.transpose(predictions, [0, 2, 1]); // Correct shape
-        
-                    const detections = [];
-                    const threshold = 0.3;
                     
-                    const [batch] = await transposed.array();
+                    // const [batch] = await transposed.array();
                     
-                    for (let i = 0; i < batch.length; i++) {
-                        const [x, y, w, h, conf, ...classes] = batch[i];
-                        const maxProb = Math.max(...classes);
-                        const classIndex = classes.indexOf(maxProb);
+                    try {
+                        // Convert tensor to an array
+                        // Convert predictions to array
+                        const predictionArray = await predictions.array();
+                        const detections = [];
+                        const threshold = 0.3;
+
+                        // Simple sigmoid function
+                        const sigmoid = (x) => 1 / (1 + Math.exp(-x));
                         
-                        if (classIndex === 0 && conf > threshold) { // Person class
-                            const bbox = [
-                                (x - w/2) * image.width,
-                                (y - h/2) * image.height,
-                                w * image.width,
-                                h * image.height
-                            ];
+                        
+                        // First dimension is batch, we take first item
+                        const outputData = predictionArray[0]; // shape: [84, 8400]
+                        
+                        // For each of the 8400 anchor boxes
+                        for (let i = 0; i < outputData[0].length; i++) {
+                            // Extract box coordinates and confidence
+                            const bbox = {
+                                x: sigmoid(outputData[0][i]),  // Center x
+                                y: sigmoid(outputData[1][i]),  // Center y
+                                w: sigmoid(outputData[2][i]),  // Width
+                                h: sigmoid(outputData[3][i])   // Height
+                            };
+
+                            // Get confidence score
+                           const conf = sigmoid(outputData[4][i]);
                             
-                            detections.push({
-                                bbox: bbox,
-                                class: 'person',
-                                score: conf
-                            });
+                            // Class scores start from index 4
+                            const classScores = [];
+                            for (let j = 5; j < 84; j++) {
+                                classScores.push(sigmoid(outputData[j][i]));
+                            }
+                            
+                            // Find highest class score and its index
+                            const maxScore = Math.max(...classScores);
+                            const classIndex = classScores.indexOf(maxScore);
+                            const finalScore = conf * maxScore;
+                            
+                            // Only process if it's a person (typically class 0) and passes threshold
+                            if (classIndex === 0 && maxScore > threshold) {
+                                // Convert normalized coordinates to pixel coordinates
+                                const width = bbox[2] * video.videoWidth;
+                                const height = bbox[3] * video.videoHeight;
+                                const x = (bbox[0] * video.videoWidth) - (width / 2);
+                                const y = (bbox[1] * video.videoHeight) - (height / 2);
+                                
+                                detections.push({
+                                    bbox:[x, y, width, height],
+                                    class: 'person',
+                                    score: finalScore
+                                });
+                            }
                         }
                     
-                    }
-                    
-                    return detections;
+                        console.log('Processed detections:', detections);
+                        return detections;
+                    } catch (error) {
+                        console.error('Error processing YOLO output:', error);
+                        throw error;
+                    }    
                 } catch (error) {
                     console.error(`Detection error with ${modelType}:`, error);
-                    console.log('Tensor shape:', tensor?.shape);
-                    console.log('Predictions shape:', predictions?.shape);
+                    if (tensor) console.log('Tensor shape:', tensor?.shape);
+                    if (predictions) console.log('Predictions shape:', predictions?.shape);
                     // If detection fails, try to recover by switching back to COCO-SSD
                     if (modelType !== 'cocossd') {
                         await switchModel('cocossd');
