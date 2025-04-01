@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Webcam Object Detector (YOLO - execute())</title> <!-- Title updated -->
+    <!-- Load TensorFlow.js -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js"></script>
+    <!-- Optional: Load WebGL backend for performance -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl@4.17.0/dist/tf-backend-webgl.min.js"></script>
+
+    <style>
+        /* CSS remains the same as the previous version */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            background-color: #f0f0f0;
+            margin: 0;
+            color: #333;
+        }
+        h1, h2 {
+            color: #333;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        .container {
+            position: relative;
+            width: 640px; /* Default Width */
+            max-width: 95%; /* Responsive */
+            border: 1px solid #ccc;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            background-color: #fff;
+            margin-bottom: 15px; /* Space before controls */
+            overflow: hidden; /* Contain canvas */
+            border-radius: 4px;
+        }
+        #video {
+            display: block;
+            width: 100%;
+            height: auto;
+        }
+        #canvas {
+           position: absolute;
+           top: 0;
+           left: 0;
+           width: 100%;
+           height: 100%;
+           z-index: 10;
+        }
+        .controls {
+            padding: 10px 15px;
+            background-color: #eee;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            width: 640px;
+            max-width: 95%;
+            box-sizing: border-box;
+        }
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .controls label {
+            font-size: 0.9em;
+            font-weight: bold;
+        }
+        .controls select {
+            padding: 5px 8px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            font-size: 0.9em;
+        }
+        #status {
+            font-size: 1em;
+            font-weight: bold;
+            color: #555;
+            margin: 15px 0 5px 0;
+            min-height: 1.2em;
+            text-align: center;
+            width: 100%;
+            padding: 8px;
+            background-color: #e9e9e9;
+            border-radius: 4px;
+            max-width: 640px;
+            box-sizing: border-box;
+        }
+         #detection-status {
+            font-weight: bold;
+            padding: 6px 12px;
+            border-radius: 4px;
+            background-color: #d3d3d3; /* Grey - default (Idle) */
+            color: #333;
+            transition: background-color 0.3s ease, color 0.3s ease;
+            font-size: 0.9em;
+            text-align: center;
+            flex-grow: 1;
+            margin-left: 10px;
+        }
+        #detection-status.human-detected {
+            background-color: #28a745; /* Green */
+            color: white;
+        }
+        #detection-status.objects-detected {
+             background-color: #17a2b8; /* Cyan Info */
+             color: white;
+         }
+        #detection-status.no-objects {
+            background-color: #ffc107; /* Yellow Warning */
+            color: #333;
+        }
+
+         #snapshot-gallery {
+            margin-top: 20px;
+            width: 100%;
+            max-width: 680px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            justify-content: center;
+            padding: 10px;
+            border-radius: 5px;
+            background-color: #e9e9e9;
+         }
+        .snapshot {
+            border: 1px solid #ccc;
+            padding: 8px;
+            background-color: #fff;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-radius: 4px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .snapshot img {
+            max-width: 150px;
+            height: auto;
+            display: block;
+            margin-bottom: 8px;
+            border: 1px solid #eee;
+            border-radius: 3px;
+        }
+        .snapshot a {
+            text-decoration: none;
+            background-color: #007bff;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-size: 0.85em;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+        .snapshot a:hover {
+            background-color: #0056b3;
+        }
+        #no-snapshots {
+             width: 100%;
+             text-align: center;
+             color: #666;
+             font-style: italic;
+         }
+
+        /* Responsive adjustments */
+        @media (max-width: 700px) {
+            body { padding: 10px; }
+            h1 { font-size: 1.5em; }
+            h2 { font-size: 1.2em; }
+            .container { width: 100%; max-width: 100%; }
+             .controls { flex-direction: column; align-items: stretch; max-width: 100%; }
+             .control-group { justify-content: space-between; width: 100%; }
+              #detection-status { width: 100%; box-sizing: border-box; margin-left: 0; margin-top: 10px; }
+             #status { max-width: 100%; font-size: 0.9em; }
+             #snapshot-gallery { max-width: 100%; gap: 10px; }
+             .snapshot img { max-width: 120px; }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Webcam Object Detector (YOLO - execute())</h1> <!-- Title updated -->
+
+    <div id="status">Initializing Application...</div>
+
+    <div class="container" id="video-container">
+        <video id="video" autoplay playsinline muted></video>
+        <canvas id="canvas"></canvas>
+    </div>
+
+    <div class="controls" id="main-controls">
+         <div class="control-group">
+             <label for="model-select">Select Model:</label>
+             <select id="model-select">
+                 <option value="yolov8n">YOLOv8n</option>
+                 <option value="yolov11n">YOLOv11n</option>
+             </select>
+         </div>
+         <div id="detection-status">Status: Idle</div>
+     </div>
+
+
+    <h2>Detected Human Snapshots</h2>
+    <div id="snapshot-gallery">
+        <p id="no-snapshots">No snapshots taken yet.</p>
+        <!-- Snapshots will be added here -->
+    </div>
+
+    <script>
+        // --- Constants ---
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const statusDiv = document.getElementById('status');
+        const modelSelect = document.getElementById('model-select');
+        const detectionStatusDiv = document.getElementById('detection-status');
+        const snapshotGallery = document.getElementById('snapshot-gallery');
+        const noSnapshotsMsg = document.getElementById('no-snapshots');
+        const videoContainer = document.getElementById('video-container');
+        const controlsDiv = document.getElementById('main-controls');
+
+        // --- Model & Detection Parameters (Adjust based on your pipeline/model) ---
+        const INPUT_WIDTH = 640;  // Width model expects
+        const INPUT_HEIGHT = 640; // Height model expects
+        const SCORE_THRESHOLD = 0.3; // Min score threshold from your pipeline
+        const NMS_THRESHOLD = 0.45;  // IoU threshold for NMS (typical value)
+        const MAX_DETECTIONS = 100; // Max detections to consider after NMS
+        const SNAPSHOT_COOLDOWN_MS = 3000;
+        const HUMAN_CLASS_ID = 0; // Assuming 0 is 'person' in your model's classes
+
+        // --- State Variables ---
+        let currentModel = null;
+        let modelName = modelSelect.value;
+        let isDetecting = false;
+        let snapshotCooldown = false;
+        let rafId = null;
+
+        // --- COCO Classes (Keep for drawing labels if needed) ---
+        const COCO_CLASSES = { /* ... Keep the COCO_CLASSES mapping here ... */
+             0: 'person', 1: 'bicycle', 2: 'car', 3: 'motorcycle', 4: 'airplane', 5: 'bus',
+             6: 'train', 7: 'truck', 8: 'boat', 9: 'traffic light', 10: 'fire hydrant',
+             11: 'stop sign', 12: 'parking meter', 13: 'bench', 14: 'bird', 15: 'cat',
+             16: 'dog', 17: 'horse', 18: 'sheep', 19: 'cow', 20: 'elephant', 21: 'bear',
+             22: 'zebra', 23: 'giraffe', 24: 'backpack', 25: 'umbrella', 26: 'handbag',
+             27: 'tie', 28: 'suitcase', 29: 'frisbee', 30: 'skis', 31: 'snowboard',
+             32: 'sports ball', 33: 'kite', 34: 'baseball bat', 35: 'baseball glove',
+             36: 'skateboard', 37: 'surfboard', 38: 'tennis racket', 39: 'bottle',
+             40: 'wine glass', 41: 'cup', 42: 'fork', 43: 'knife', 44: 'spoon', 45: 'bowl',
+             46: 'banana', 47: 'apple', 48: 'sandwich', 49: 'orange', 50: 'broccoli',
+             51: 'carrot', 52: 'hot dog', 53: 'pizza', 54: 'donut', 55: 'cake', 56: 'chair',
+             57: 'couch', 58: 'potted plant', 59: 'bed', 60: 'dining table', 61: 'toilet',
+             62: 'tv', 63: 'laptop', 64: 'mouse', 65: 'remote', 66: 'keyboard', 67: 'cell phone',
+             68: 'microwave', 69: 'oven', 70: 'toaster', 71: 'sink', 72: 'refrigerator',
+             73: 'book', 74: 'clock', 75: 'vase', 76: 'scissors', 77: 'teddy bear',
+             78: 'hair drier', 79: 'toothbrush'
+         };
+
+        // --- Model Loading (Remains the same, warmup uses execute) ---
+        async function loadModel(name) {
+             statusDiv.textContent = `Switching to ${name}...`; console.log(`Loading model: ${name}`);
+             detectionStatusDiv.textContent = 'Status: Idle'; detectionStatusDiv.className = 'detection-status';
+             isDetecting = false; if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+
+             if (currentModel) {
+                 console.log("Disposing prev model..."); statusDiv.textContent = `Disposing...`;
+                 await new Promise(resolve => setTimeout(resolve, 50));
+                 try { currentModel.dispose(); currentModel = null; } catch (e) { console.error(e); }
+                  ctx.clearRect(0, 0, canvas.width, canvas.height);
+             }
+
+             statusDiv.textContent = `Init TFJS backend...`; await new Promise(resolve => setTimeout(resolve, 50));
+             await tf.ready();
+              try { await tf.setBackend('webgl'); await tf.ready(); console.log("Using WebGL"); }
+              catch (e) { console.warn("WebGL failed -> CPU", e); try { await tf.setBackend('cpu'); await tf.ready(); console.log("Using CPU"); } catch (cpuError) { console.error(cpuError); statusDiv.textContent = "TFJS Error."; return false; } }
+
+             const modelPath = `./${name}_web_model/model.json`;
+             console.log(`Model path: ${modelPath}`); statusDiv.textContent = `Loading ${name}...`;
+
+             try {
+                 currentModel = await tf.loadGraphModel(modelPath); console.log(`${name} loaded.`);
+                 statusDiv.textContent = `Warming ${name}...`; await new Promise(resolve => setTimeout(resolve, 100));
+
+                 console.time(`Warm-up ${name}`);
+                 tf.tidy(() => { // Use tf.tidy for warmup tensors
+                      const dummyInput = tf.zeros([1, INPUT_HEIGHT, INPUT_WIDTH, 3], 'float32');
+                      const dummyOutput = currentModel.execute(dummyInput); // SYNC execute for warmup
+                      if (Array.isArray(dummyOutput)) dummyOutput.forEach(t => t.dispose()); else if (dummyOutput) dummyOutput.dispose();
+                 });
+                 console.timeEnd(`Warm-up ${name}`);
+
+                 statusDiv.textContent = `${name} ready.`; console.log(`${name} initialized.`); modelName = name;
+
+                 if (video.readyState >= 4) { startDetectionLoop(); }
+                 else { console.warn("Webcam not ready."); video.addEventListener('canplay', startDetectionLoop, { once: true }); }
+                 return true;
+
+             } catch (error) {
+                 statusDiv.textContent = `Error loading/warming ${name}. Check console.`;
+                 console.error(`Model Error (${name} @ ${modelPath}):`, error);
+                 currentModel = null; isDetecting = false; if (rafId) cancelAnimationFrame(rafId); rafId = null;
+                 return false;
+             }
+         }
+
+        // --- Webcam Setup (Remains the same) ---
+        async function setupWebcam() {
+             return new Promise((resolve, reject) => {
+                 if (!navigator.mediaDevices?.getUserMedia) { reject('getUserMedia unsupported.'); return; }
+                  navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' }, audio: false })
+                     .then(stream => {
+                         video.srcObject = stream;
+                         video.addEventListener('loadedmetadata', () => {
+                             canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+                             videoContainer.style.height = `${video.videoHeight}px`;
+                             console.log(`Webcam started: ${video.videoWidth}x${video.videoHeight}`); resolve();
+                         }, { once: true });
+                          video.addEventListener('error', (e) => { reject(`Webcam error: ${e.message || 'Unknown'}`); });
+                     })
+                     .catch(err => { console.error("getUserMedia error:", err); reject(`Webcam Access Error: ${err.name}`); });
+             });
+         }
+
+        // --- Detection Loop Control (Remains the same) ---
+        function startDetectionLoop() {
+            if (!currentModel) { console.warn("No model."); statusDiv.textContent = "Load model."; return; }
+            if (video.paused || video.ended || video.readyState < 4) { console.warn("Video not ready."); statusDiv.textContent = "Wait video..."; video.removeEventListener('canplay', startDetectionLoop); video.addEventListener('canplay', startDetectionLoop, { once: true }); return; }
+            if (isDetecting) { console.log("Already detecting."); return; }
+            console.log("Starting detection loop..."); statusDiv.textContent = `Detecting (${modelName})...`;
+            detectFrame();
+        }
+
+        // --- *** PROCESSING PIPELINE (Corrected Slice Indices) *** ---
+        async function processDetections(predictionsTensor) {
+            // Input: Raw predictions tensor from model.execute
+            // Output: { boxes: Float32Array[], scores: number[], classIds: number[] }
+            //         where boxes are normalized [y1, x1, y2, x2]
+
+            const finalBoxes = [];
+            const finalScores = [];
+            const finalClassIds = [];
+            // Keep track of tensors to dispose manually
+            let tensorsToDispose = [];
+
+            try {
+                 const transposedPreds = predictionsTensor.transpose([0, 2, 1]); // [1, 8400, 84]
+                 tensorsToDispose.push(transposedPreds);
+
+                 // --- Corrected Slicing for [..., 84] structure ---
+                 const boxes = transposedPreds.slice([0, 0, 0], [-1, -1, 4]);     // Indices 0-3: Box [cx, cy, w, h]
+                 const classes = transposedPreds.slice([0, 0, 4], [-1, -1, 80]); // Indices 4-83: Class scores (80 classes)
+                 tensorsToDispose.push(boxes, classes);
+
+                 // Squeeze to remove batch dim -> [num_boxes, features]
+                 const squeezedBoxes = tf.squeeze(boxes);    // [8400, 4]
+                 const squeezedClasses = tf.squeeze(classes); // [8400, 80]
+                 tensorsToDispose.push(squeezedBoxes, squeezedClasses);
+
+                 // --- Calculate Max Score and Class ID per detection ---
+                 const maxScores = tf.max(squeezedClasses, 1);   // Max score along class axis -> [8400]
+                 const classIdsTensor = tf.argMax(squeezedClasses, 1); // Index of max score (Class ID) -> [8400]
+                 tensorsToDispose.push(maxScores, classIdsTensor);
+
+                 // --- Pre-filtering based on Max Score Threshold ---
+                 const scoresArray = await maxScores.array(); // Get scores as JS array
+                 const filteredIndices = scoresArray
+                     .map((score, index) => score > SCORE_THRESHOLD ? index : -1)
+                     .filter(index => index !== -1);
+
+                 if (filteredIndices.length === 0) {
+                     console.log("No detections above score threshold.");
+                     return { boxes: [], scores: [], classIds: [] }; // Return empty results
+                 }
+
+                 const filteredIndicesTensor = tf.tensor1d(filteredIndices, 'int32');
+                 tensorsToDispose.push(filteredIndicesTensor);
+
+                 // --- Gather boxes, scores, and class IDs using filtered indices ---
+                 const boxes_filtered = squeezedBoxes.gather(filteredIndicesTensor);
+                 const scores_filtered = maxScores.gather(filteredIndicesTensor); // Gather the calculated max scores
+                 const classIds_filtered = classIdsTensor.gather(filteredIndicesTensor); // Gather the calculated class IDs
+                 tensorsToDispose.push(boxes_filtered, scores_filtered, classIds_filtered);
+
+                 // --- Non-Max Suppression ---
+                 // NMS needs boxes in [y1, x1, y2, x2] format if using standard TFJS NMS.
+                 // However, your original pipeline used cx, cy, w, h directly.
+                 // Let's assume standard NMS and convert AFTER NMS for drawing if needed,
+                 // OR convert *before* NMS if your NMS implementation expects that.
+                 // Sticking to using raw boxes_filtered (cx, cy, w, h) for NMS as per your likely previous intent.
+                 // If NMS fails, you might need to convert boxes_filtered to y1,x1,y2,x2 first.
+
+                 const selectedIndicesTensor = await tf.image.nonMaxSuppressionAsync(
+                     boxes_filtered,      // Assuming NMS handles cx,cy,w,h or you adjusted it
+                     scores_filtered,     // Scores: shape [num_filtered]
+                     MAX_DETECTIONS,      // Max boxes to keep
+                     NMS_THRESHOLD,       // IoU Threshold
+                     SCORE_THRESHOLD      // Score Threshold (can re-apply here)
+                 );
+                 tensorsToDispose.push(selectedIndicesTensor);
+                 const selectedIndices = await selectedIndicesTensor.array(); // Get indices as JS array
+
+                 // --- Process selected boxes ---
+                 const boxesData = await boxes_filtered.array();     // Data of FILTERED boxes [cx, cy, w, h]
+                 const scoresData = await scores_filtered.array();   // Data of FILTERED scores (max class score)
+                 const classIdsData = await classIds_filtered.array(); // Data of FILTERED class IDs
+
+                 for (const index of selectedIndices) { // Loop through the *indices* returned by NMS
+                     // `index` here refers to the position within the *filtered* tensors
+                     const classId = classIdsData[index]; // Get the final Class ID
+                     const score = scoresData[index];     // Get the final Score
+
+                     // Get box coordinates [cx, cy, w, h] for this detection
+                     const [cx, cy, w, h] = boxesData[index];
+
+                     // --- Convert to normalized [y1, x1, y2, x2] ---
+                     const norm_cx = cx / INPUT_WIDTH;
+                     const norm_cy = cy / INPUT_HEIGHT;
+                     const norm_w = w / INPUT_WIDTH;
+                     const norm_h = h / INPUT_HEIGHT;
+                     const y1 = norm_cy - norm_h / 2;
+                     const x1 = norm_cx - norm_w / 2;
+                     const y2 = norm_cy + norm_h / 2;
+                     const x2 = norm_cx + norm_w / 2;
+
+                     finalBoxes.push([ Math.max(0, y1), Math.max(0, x1), Math.min(1, y2), Math.min(1, x2) ]);
+                     finalScores.push(score);
+                     finalClassIds.push(classId);
+                 }
+
+                return { boxes: finalBoxes, scores: finalScores, classIds: finalClassIds };
+
+            } catch(error) {
+                console.error("Error in processDetections:", error);
+                return { boxes: [], scores: [], classIds: [] }; // Return empty on error
+            } finally {
+                // Dispose intermediate tensors created *within this function*
+                tf.dispose(tensorsToDispose);
+                // DO NOT dispose predictionsTensor here, it's disposed in detectFrame
+            }
+        }
+
+
+        // --- Main Detection Frame Logic (Using model.execute()) ---
+        async function detectFrame() { // Still async due to other awaits (like processDetections data())
+             if (!currentModel || video.paused || video.ended || video.readyState < 3) {
+                 console.log("Stopping detection loop."); isDetecting = false; if (rafId) cancelAnimationFrame(rafId); rafId = null;
+                 statusDiv.textContent = currentModel ? "Webcam stopped." : "Model unloaded."; updateDetectionStatus(null, null, true); return;
+             }
+             if (isDetecting) return;
+
+             isDetecting = true; rafId = null;
+             let inputTensor;
+             let predictions; // Raw model output tensor(s)
+
+             try {
+                 // --- Preprocessing and SYNC Inference ---
+                 [inputTensor, predictions] = tf.tidy(() => { // Wrap preprocessing and sync execution in tidy
+                      const tempInput = tf.tidy(() => { // Inner tidy for just preprocessing tensors
+                           const imgTensor = tf.browser.fromPixels(video);
+                           const resizedTensor = tf.image.resizeBilinear(imgTensor.toFloat(), [INPUT_HEIGHT, INPUT_WIDTH]);
+                           const normalizedTensor = resizedTensor.div(255.0);
+                           return normalizedTensor.expandDims(0);
+                      });
+
+                      // *** Use synchronous model.execute() ***
+                      // Note: This WILL block the main thread during inference.
+                      const tempPredictions = currentModel.execute(tempInput);
+
+                      // Return both tensors from the outer tidy to keep them
+                      return [tempInput, tempPredictions];
+                 });
+                 // inputTensor is kept by tidy's return, dispose it manually after use (or lack thereof)
+                 // predictions are kept by tidy's return
+
+
+                 // Assuming the model returns a single tensor matching processDetections input
+                 const rawOutputTensor = Array.isArray(predictions) ? predictions[0] : predictions;
+
+                 if (!rawOutputTensor) {
+                      console.warn("Model execution returned null or undefined output.");
+                      // Predictions are already kept outside tidy, dispose here if needed
+                      if(Array.isArray(predictions)) predictions.forEach(t => t?.dispose());
+                      else predictions?.dispose();
+                      if(inputTensor && !inputTensor.isDisposed) inputTensor.dispose(); // Dispose input if not used
+                      return; // Go to finally block
+                 }
+
+                  // Dispose input tensor now that inference is done
+                  if(inputTensor && !inputTensor.isDisposed) {
+                      inputTensor.dispose();
+                      inputTensor = null;
+                  }
+
+                 // --- *** Call Your Processing Pipeline *** ---
+                 // processDetections needs async because it uses .array()/.data() internally
+                 const { boxes: finalBoxes, scores: finalScores, classIds: finalClassIds } = await processDetections(rawOutputTensor);
+                 // processDetections disposes its *internal* tensors.
+
+                 // --- Log detected objects ---
+                 if (finalClassIds.length > 0) {
+                     const detections = finalClassIds.map((id, i) => ({ class: COCO_CLASSES[id] || `ID ${id}`, score: (finalScores[i] * 100).toFixed(1) + '%' }));
+                     console.log("Detected:", detections);
+                 }
+
+                 // --- Draw Boxes ---
+                 drawBoundingBoxes(finalBoxes, finalScores, finalClassIds);
+
+                 // --- Status Update & Snapshot ---
+                 const detectedObjects = finalBoxes.length > 0;
+                 const humanDetected = finalClassIds.includes(HUMAN_CLASS_ID);
+                 updateDetectionStatus(humanDetected, !detectedObjects);
+
+                 if (humanDetected && !snapshotCooldown) {
+                     takeSnapshot(finalBoxes); snapshotCooldown = true;
+                     setTimeout(() => { snapshotCooldown = false; }, SNAPSHOT_COOLDOWN_MS);
+                 }
+
+             } catch (error) {
+                 console.error("Error during detection frame:", error); statusDiv.textContent = "Detection Error.";
+                 // Clean up input tensor if error occurred before disposal
+                  if(inputTensor && !inputTensor.isDisposed) {
+                     inputTensor.dispose();
+                     inputTensor = null;
+                  }
+             } finally {
+                  // Dispose the raw predictions tensor(s) that were kept by the main tidy block
+                  if (predictions) {
+                      if (Array.isArray(predictions)) predictions.forEach(t => t?.dispose());
+                      else predictions?.dispose();
+                  }
+                 // --- Schedule next frame ---
+                 isDetecting = false;
+                 if (currentModel && !video.paused && !video.ended) { rafId = requestAnimationFrame(detectFrame); }
+             }
+         }
+
+        // --- Drawing (Uses normalized [y1, x1, y2, x2]) (Remains the same) ---
+        function drawBoundingBoxes(boxes, scores, classIds) {
+             ctx.clearRect(0, 0, canvas.width, canvas.height);
+             if (!boxes || boxes.length === 0) return;
+             const colors = ['#00FF00', '#FF0000', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF'];
+             ctx.lineWidth = 2; ctx.font = '14px Arial';
+
+             boxes.forEach((box, i) => {
+                 const classId = classIds[i];
+                 const className = COCO_CLASSES[classId] || `ID ${classId}`;
+                 const color = colors[classId % colors.length];
+                 ctx.strokeStyle = color; ctx.fillStyle = color;
+
+                 const [y1Norm, x1Norm, y2Norm, x2Norm] = box; // Already normalized
+                 const x = x1Norm * canvas.width;
+                 const y = y1Norm * canvas.height;
+                 const width = (x2Norm - x1Norm) * canvas.width;
+                 const height = (y2Norm - y1Norm) * canvas.height;
+                 const validWidth = Math.max(0, width); const validHeight = Math.max(0, height);
+
+                 ctx.strokeRect(x, y, validWidth, validHeight);
+                 const scoreText = `${className}: ${(scores[i] * 100).toFixed(1)}%`;
+                 const textWidth = ctx.measureText(scoreText).width;
+                 const textHeight = parseInt(ctx.font, 10);
+                 ctx.fillRect(x, y - (textHeight + 4), textWidth + 4, textHeight + 4);
+                 ctx.fillStyle = '#000000'; ctx.fillText(scoreText, x + 2, y - 4);
+             });
+         }
+
+        // --- UI Status Update (Remains the same) ---
+        function updateDetectionStatus(isHumanDetected, noObjectsDetected, reset = false) {
+             if (reset) { detectionStatusDiv.textContent = 'Status: Idle'; detectionStatusDiv.className = 'detection-status'; return; }
+             if (isHumanDetected) { detectionStatusDiv.textContent = 'Status: Human Detected!'; detectionStatusDiv.className = 'detection-status human-detected'; }
+             else if (!noObjectsDetected) { detectionStatusDiv.textContent = 'Status: Objects Detected (No Human)'; detectionStatusDiv.className = 'detection-status objects-detected'; }
+             else { detectionStatusDiv.textContent = 'Status: No Objects'; detectionStatusDiv.className = 'detection-status no-objects'; }
+          }
+
+        // --- Snapshot Logic (Remains the same) ---
+        function takeSnapshot(boxesToDraw) {
+             // ... (snapshot code remains identical to previous version) ...
+            console.log("Taking HUMAN detection snapshot...");
+            if (noSnapshotsMsg) noSnapshotsMsg.style.display = 'none';
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = video.videoWidth; tempCanvas.height = video.videoHeight;
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCtx.drawImage(video, 0, 0, tempCanvas.width, tempCanvas.height);
+
+            if (boxesToDraw?.length > 0) {
+                tempCtx.strokeStyle = '#FF0000'; tempCtx.lineWidth = 2;
+                boxesToDraw.forEach(box => {
+                    const [y1Norm, x1Norm, y2Norm, x2Norm] = box;
+                    const x = x1Norm * tempCanvas.width, y = y1Norm * tempCanvas.height;
+                    const width = (x2Norm - x1Norm) * tempCanvas.width;
+                    const height = (y2Norm - y1Norm) * tempCanvas.height;
+                    tempCtx.strokeRect(x, y, Math.max(0, width), Math.max(0, height));
+                });
+            }
+
+            const imageDataUrl = tempCanvas.toDataURL('image/jpeg', 0.9);
+            const snapshotDiv = document.createElement('div'); snapshotDiv.classList.add('snapshot');
+            const img = document.createElement('img'); img.src = imageDataUrl; img.alt = "Human detection snapshot";
+            const downloadLink = document.createElement('a'); downloadLink.href = imageDataUrl;
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            downloadLink.download = `human_snapshot_${timestamp}.jpg`; downloadLink.textContent = 'Save';
+            snapshotDiv.appendChild(img); snapshotDiv.appendChild(downloadLink);
+            snapshotGallery.insertBefore(snapshotDiv, snapshotGallery.firstChild);
+
+            const maxSnapshots = 20; const snapshotNodes = snapshotGallery.querySelectorAll('.snapshot');
+             while (snapshotNodes.length > maxSnapshots && snapshotGallery.lastChild?.classList.contains('snapshot')) {
+                 snapshotGallery.removeChild(snapshotGallery.lastChild);
+             }
+         }
+
+        // --- Event Listeners (Remain the same) ---
+        modelSelect.addEventListener('change', async (event) => { const newModelName = event.target.value; if (newModelName !== modelName) { console.log(`Switching to ${newModelName}`); modelSelect.disabled = true; await loadModel(newModelName); modelSelect.disabled = false; } });
+        window.addEventListener('load', async () => { statusDiv.textContent = "Initializing..."; modelSelect.disabled = true; detectionStatusDiv.className = 'detection-status'; try { statusDiv.textContent = "Setting up Webcam..."; await setupWebcam(); statusDiv.textContent = "Loading initial model..."; const loaded = await loadModel(modelName); if (!loaded) { const msg = `Failed initial model load: ${modelName}.`; statusDiv.textContent = msg; alert(msg); } } catch (error) { statusDiv.textContent = `Init Error: ${error}`; console.error("Init failed:", error); alert(`Error initializing: ${error}`); } finally { modelSelect.disabled = false; } });
+        document.addEventListener('visibilitychange', () => { if (!currentModel || !video.srcObject) return; if (document.hidden) { console.log("Pausing detection."); if (rafId) cancelAnimationFrame(rafId); rafId = null; isDetecting = false; video.pause(); statusDiv.textContent = "Paused."; updateDetectionStatus(null, null, true); } else { console.log("Resuming detection."); video.play().catch(e => console.error(e)); startDetectionLoop(); } });
+
+    </script>
+
+</body>
+</html>
