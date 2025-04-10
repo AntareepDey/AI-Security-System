@@ -3,615 +3,798 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI surveillance system</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/tensorflow/4.15.0/tf.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+    <title>Insect Detector</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl@4.17.0/dist/tf-backend-webgl.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono&display=swap" rel="stylesheet">   
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
-<body>
-    <div class="login-overlay" id="loginOverlay">
-        <div class="login-container">
-            <div class="side-image">
-                <img src="unnamed.png" alt="Security System">
+<body class="light-mode">
+    <div class="page-wrapper">
+        <nav class="navbar glass-effect">
+            <div class="nav-title">Insect Detector</div>
+            <div class="theme-toggle">
+                <span class="material-icons-round light-icon">light_mode</span>
+                <label class="switch">
+                    <input type="checkbox" id="theme-switch">
+                    <span class="slider round"></span>
+                </label>
+                <span class="material-icons-round dark-icon">dark_mode</span>
             </div>
-            <div class="login-form">
-                <h1 class="title">Login</h1>
-                <form id="loginForm">
-                    <div class="form-group">
-                        <label for="name">Name</label>
-                        <input type="text" id="name" required placeholder="Enter your name">
-                        <div class="error-message" id="nameError"></div>
+        </nav>
+
+        <main>
+            <div class="app-container">
+                <div class="left-column">
+                    <div class="video-container glass-effect" id="video-container">
+                        <video id="video" autoplay playsinline muted></video>
+                        <canvas id="canvas"></canvas>
                     </div>
-                    <div class="form-group">
-                        <label for="email">Email</label>
-                        <input type="email" id="email" required placeholder="Enter your email">
-                        <div class="error-message" id="emailError"></div>
+                    
+                    <div class="controls-bar glass-effect" id="main-controls">
+                        <div class="control-group">
+                            <div class="model-select-wrapper">
+                                <label for="model-select">Model:</label>
+                                <select id="model-select" disabled>
+                                    <option value="yolov8n">YOLOv8n</option>
+                                    <option value="yolov11n">YOLOv11n</option>
+                                </select>
+                            </div>
+                            <div id="detection-status">Status: Idle</div>
+                        </div>
+                        <div class="control-group">
+                            <button id="start-stop-btn" class="start btn-effect" disabled>
+                                <span class="material-icons-round">play_arrow</span>
+                                <span class="btn-text">Start Detecting</span>
+                            </button>
+                            <button id="gallery-toggle" class="gallery-btn btn-effect">
+                                <span class="material-icons-round">photo_library</span>
+                                <span class="btn-text">Show Gallery</span>
+                            </button>
+                        </div>
                     </div>
-                    <button type="submit" class="login-btn">Login</button>
-                </form>
+                </div>
+                
+                <div class="right-column">
+                    <div class="status-card glass-effect" id="status">Initializing Application...</div>
+                    
+                    <div class="model-loading-container glass-effect" id="loading-container">
+                        <div class="loading-header">
+                            <h4>Loading Model</h4>
+                            <span id="loading-percent">0%</span>
+                        </div>
+                        <div class="progress-container">
+                            <div class="progress-bar" id="loading-bar"></div>
+                        </div>
+                        <div id="loading-status">Preparing...</div>
+                    </div>
+                    
+                    <div class="status-history glass-effect" id="status-history">
+                        <h3>Status History</h3>
+                        <ul id="status-logs"></ul>
+                    </div>
+                </div>
             </div>
-        </div>
-    </div>
 
-    <div class="loading-overlay" id="loadingOverlay">Loading AI Model...</div>
-
-    <div class="notification" id="emailNotification">Email alert sent successfully!</div>
-
-    <nav class="navbar">
-        <h1>AI surveillance system</h1>
-        <div class="model-selector">
-            <select id="modelSelector">
-                <option value="cocossd">COCO-SSD</option>
-                <option value="yolov8">YOLOv8</option>
-                <option value="cocossd">YOLOv11</option>
-            </select>
-        </div>
-        <div class="user-info" id="userInfo"></div>
-        
-    </nav>
-
-    <div class="main-content">
-        <div class="camera-section">
-            <div class="camera-container">
-                <button class="mirror-btn" id="mirrorBtn">↔️ Flip</button>
-                <video id="webcam" autoplay playsinline></video>
-                <canvas id="canvas"></canvas>
+            <div class="gallery-section glass-effect" id="gallery-section">
+                <div class="gallery-header">
+                    <h2>Detected Target Insect Snapshots</h2>
+                    <button id="gallery-close" class="close-btn glass-effect">
+                        <span class="material-icons-round">close</span>
+                    </button>
+                </div>
+                <div id="snapshot-gallery">
+                    <p id="no-snapshots">No snapshots taken yet.</p>
+                </div>
             </div>
-            <div class="controls">
-                <button class="btn" id="photoBtn">📸 Snapshot</button>
-                <button class="btn" id="recordBtn">🔴 Record</button>
-                <button class="btn" id="autoRecordBtn">🎯 Auto Record</button>
-            </div>
-        </div>
+        </main>
 
-        <div class="sidebar">
-            <div class="status-indicator">
-                <div class="status-dot" id="statusDot"></div>
-                <span id="statusText">Loading...</span>
-            </div>
-            <div class="activity-log">
-                <h2>Instructions:</h2>
-                <div id="activityContainer"></div>
+        <div id="notification-container">
+            <div id="emailNotification" class="glass-effect">
+                <span class="material-icons-round notification-icon success-icon">check_circle</span>
+                <span class="notification-text">Email Sent Successfully!</span>
             </div>
         </div>
     </div>
 
     <script>
-        // Initialize EmailJS
-        (function() {
-            emailjs.init("yOSX3VHJ1ATMpu1y1");
-        })();
+        // EmailJS init and all the original script content remains unchanged
+        emailjs.init("<APIKEY>"); // Replace with your actual EmailJS public key
 
-        // Global variables
-        let model;
-        let isRecording = false;
-        let autoRecordEnabled = false;
-        let mediaRecorder = null;
-        let recordedChunks = [];
-        let recordingStartTime = null;
-        let timerInterval = null;
-        let lastPersonDetectionTime = null;
-        let lastNotificationTime = 0;
-        let mirrored = false;
-        let noPersonTimeout = null;
-        let userEmail = '';
-        let userName = '';
-        let currentModel = 'cocossd';
-        let modelInstance = null;
-
-        // DOM elements
-        const video = document.getElementById('webcam');
+        // --- DOM Element References ---
+        const video = document.getElementById('video');
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
+        const statusDiv = document.getElementById('status');
+        const statusLogs = document.getElementById('status-logs');
+        const modelSelect = document.getElementById('model-select');
+        const detectionStatusDiv = document.getElementById('detection-status');
+        const snapshotGallery = document.getElementById('snapshot-gallery');
+        const noSnapshotsMsg = document.getElementById('no-snapshots');
+        const videoContainer = document.getElementById('video-container');
+        const controlsDiv = document.getElementById('main-controls');
+        const startStopBtn = document.getElementById('start-stop-btn');
+        const emailNotificationDiv = document.getElementById('emailNotification');
+        
+        // Loading references
+        const loadingContainer = document.getElementById('loading-container');
+        const loadingBar = document.getElementById('loading-bar');
+        const loadingPercent = document.getElementById('loading-percent');
+        const loadingStatus = document.getElementById('loading-status');
 
-        // Login form handling
-        document.getElementById('loginForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            
-            document.getElementById('nameError').style.display = 'none';
-            document.getElementById('emailError').style.display = 'none';
-            
-            userName = document.getElementById('name').value.trim();
-            userEmail = document.getElementById('email').value.trim();
-            
-            let isValid = true;
-            
-            if (userName.length < 2) {
-                document.getElementById('nameError').textContent = 'Name must be at least 2 characters';
-                document.getElementById('nameError').style.display = 'block';
-                isValid = false;
-            }
-            
-            if (!userEmail.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
-                document.getElementById('emailError').textContent = 'Please enter a valid email address';
-                document.getElementById('emailError').style.display = 'block';
-                isValid = false;
-            }
-            
-            if (isValid) {
-                document.getElementById('loginOverlay').style.display = 'none';
-                document.getElementById('userInfo').textContent = `User: ${userName}`;
-                await initialize();
-            }
-        });
+        // --- Model & Detection Parameters ---
+        const INPUT_WIDTH = 640; // Model input width
+        const INPUT_HEIGHT = 640; // Model input height
+        const SCORE_THRESHOLD = 0.6;  // Confidence threshold (lowered)
+        const NMS_THRESHOLD = 0.5;   // Non-Maximum Suppression threshold
+        const MAX_DETECTIONS = 100;   // Max detections per frame after NMS
 
-        // Email notification function
-        async function sendEmail(message) {
-            const currentTime = Date.now();
-            if (currentTime - lastNotificationTime > 600000) { // 10 minutes cooldown
-                try {
-                    await emailjs.send(
-                        "service_x0qqh0z",
-                        "template_tr6u4qr",
-                        {
-                            to_email: userEmail,
-                            message: message,
-                        }
-                    );
-                    
-                    const notification = document.getElementById('emailNotification');
-                    notification.style.display = 'block';
+        // --- Target Classes for Snapshot/Email ---
+        const TARGET_CLASS_IDS = new Set([4, 5, 6, 8, 9, 24, 25, 56, 92, 97]);
+
+        // --- Snapshot & Email Parameters ---
+        const SNAPSHOT_MIN_INTERVAL_MS = 1 * 60 * 1000; // 1 minute
+        const EMAIL_COOLDOWN_MS = 10 * 60 * 1000; // 10 minutes
+        const IMGBB_API_KEY = "<API KEY>"; // WARNING: Insecure
+        const EMAILJS_SERVICE_ID = "<API KEY>"; // WARNING: Insecure
+        const EMAILJS_TEMPLATE_ID = "<API KEY>"; // WARNING: Insecure
+
+        // --- State Variables ---
+        let currentModel = null;
+        let modelName = modelSelect.value;
+        let isDetecting = false;
+        let isDetectionRunning = false;
+        let rafId = null;
+        let lastSnapshotTime = 0;
+        let lastDetectedClassesSet = null;
+        let lastNotificationTime = 0;
+        let loadingInterval = null;
+
+        // Helper function to add a status log entry
+        function addStatusLog(message) {
+            statusDiv.textContent = message;
+            
+            const logItem = document.createElement('li');
+            const timestamp = new Date().toLocaleTimeString();
+            logItem.innerHTML = `<span class="log-time">${timestamp}</span> ${message}`;
+            statusLogs.prepend(logItem);
+            
+            // Limit log entries
+            if (statusLogs.children.length > 10) {
+                statusLogs.removeChild(statusLogs.lastChild);
+            }
+        }
+
+        // Helper function to update the loading progress
+        function updateLoadingProgress(stage, percent = null) {
+            if (loadingInterval) {
+                clearInterval(loadingInterval);
+                loadingInterval = null;
+            }
+            
+            loadingStatus.textContent = stage;
+            
+            if (percent === null) {
+                // Start animated progress
+                loadingBar.style.width = '0%';
+                loadingPercent.textContent = '0%';
+                loadingContainer.style.display = 'block';
+                
+                let progress = 0;
+                const target = stage === 'Preparing...' ? 20 : 
+                               stage === 'Initializing Backend...' ? 40 :
+                               stage === 'Loading Model...' ? 70 :
+                               stage === 'Warming Up...' ? 90 : 95;
+                
+                loadingInterval = setInterval(() => {
+                    if (progress < target) {
+                        progress += 1;
+                        loadingBar.style.width = `${progress}%`;
+                        loadingPercent.textContent = `${progress}%`;
+                    } else {
+                        clearInterval(loadingInterval);
+                        loadingInterval = null;
+                    }
+                }, 30);
+            } else {
+                // Set exact progress
+                loadingBar.style.width = `${percent}%`;
+                loadingPercent.textContent = `${percent}%`;
+                
+                if (percent >= 100) {
+                    // Hide loading bar after completion with animation
                     setTimeout(() => {
-                        notification.style.display = 'none';
-                    }, 3000);
-                    
-                    lastNotificationTime = currentTime;
-                    // addActivity('Email alert sent');
-                } catch (error) {
-                    console.error('Failed to send email:', error);
-                    // addActivity('Failed to send email alert');
+                        loadingContainer.classList.add('complete');
+                        setTimeout(() => {
+                            loadingContainer.style.display = 'none';
+                            loadingContainer.classList.remove('complete');
+                        }, 500);
+                    }, 500);
                 }
             }
         }
 
-        // Create a model factory
-        const modelFactory = {
-            models: {
-                cocossd: null,
-                yolov8: null,
-                yolov11: null
-            },
-
-            async loadModel(modelType) {
-                try {
-                    switch(modelType) {
-                        case 'cocossd':
-                            if (!this.models.cocossd) {
-                                this.models.cocossd = await cocoSsd.load();
-                            }
-                            return this.models.cocossd;
-                        
-                        case 'yolov8':
-                            if (!this.models.yolov8) {
-                                // Load local YOLOv8 model
-                                this.models.yolov8 = await tf.loadGraphModel('./yolov8n_web_model/model.json');
-                            }
-                            return this.models.yolov8;
-                        
-                        case 'yolov11':
-                            if (!this.models.yolov11) {
-                                // Assuming YOLOv11 is also local
-                                this.models.yolov11 = await tf.loadGraphModel('./yolov11n_web_model/model.json');
-                            }
-                            return this.models.yolov11;
-                        
-                        default:
-                            throw new Error('Invalid model type');
-                    }
-                } catch (error) {
-                    console.error(`Error loading ${modelType} model:`, error);
-                    throw error;
-                }
-            },
-
-            async detect(modelType, image) {
-                let tensor = null;
-                let predictions = null;
-                try {
-                    if (modelType === 'cocossd') {
-                        return await this.models[modelType].detect(image);
-                    }
-                    
-                    // For YOLO models
-                    // Step 1: Create a fixed size canvas for resizing
-                    const offscreenCanvas = document.createElement('canvas');
-                    offscreenCanvas.width = 640;  // YOLO expected width
-                    offscreenCanvas.height = 640; // YOLO expected height
-                    const offscreenCtx = offscreenCanvas.getContext('2d');
-                    
-                    // Step 2: Calculate aspect ratio preserving dimensions
-                    const scale = Math.min(640 / image.width, 640 / image.height);
-                    const scaledWidth = image.width * scale;
-                    const scaledHeight = image.height * scale;
-                    const offsetX = (640 - scaledWidth) / 2;
-                    const offsetY = (640 - scaledHeight) / 2;
-                    
-                    // Step 3: Draw image with padding to maintain aspect ratio
-                    offscreenCtx.fillStyle = '#000';
-                    offscreenCtx.fillRect(0, 0, 640, 640);
-                    offscreenCtx.drawImage(image, offsetX, offsetY, scaledWidth, scaledHeight);
-                    
-                    // Step 4: Convert to tensor and normalize
-                    // Process image using tf.tidy for automatic tensor cleanup
-                    tensor = tf.tidy(() => {
-                    return tf.browser.fromPixels(offscreenCanvas)
-                        .expandDims(0)
-                        .toFloat()
-                        .div(255.0);
-                    });
-                    // Run inference
-                    predictions = this.models[modelType].predict(tensor);
-                    // console.log('Raw YOLO output:', predictions);
-                    // console.log('Output shape:', predictions.shape);
-            
-                    
-                    // const [batch] = await transposed.array();
-                    
-                    try {
-                        // Convert tensor to an array
-                        // Convert predictions to array
-                        const predictionArray = await predictions.array();
-                        const detections = [];
-                        const threshold = 0.3;
-
-                        // Simple sigmoid function
-                        const sigmoid = (x) => 1 / (1 + Math.exp(-x));
-                        
-                        
-                        // First dimension is batch, we take first item
-                        const outputData = predictionArray[0]; // shape: [84, 8400]
-                        
-                        // For each of the 8400 anchor boxes
-                        for (let i = 0; i < outputData[0].length; i++) {
-                            // Extract box coordinates and confidence
-                            const bbox = {
-                                x: sigmoid(outputData[0][i]),  // Center x
-                                y: sigmoid(outputData[1][i]),  // Center y
-                                w: sigmoid(outputData[2][i]),  // Width
-                                h: sigmoid(outputData[3][i])   // Height
-                            };
-
-                            // Get confidence score
-                           const conf = sigmoid(outputData[4][i]);
-                            
-                            // Class scores start from index 4
-                            const classScores = [];
-                            for (let j = 5; j < 84; j++) {
-                                classScores.push(sigmoid(outputData[j][i]));
-                            }
-                            
-                            // Find highest class score and its index
-                            const maxScore = Math.max(...classScores);
-                            const classIndex = classScores.indexOf(maxScore);
-                            const finalScore = conf * maxScore;
-                            
-                            // Only process if it's a person (typically class 0) and passes threshold
-                            if (classIndex === 0 && maxScore > threshold) {
-                                // Convert normalized coordinates to pixel coordinates
-                                const width = bbox[2] * video.videoWidth;
-                                const height = bbox[3] * video.videoHeight;
-                                const x = (bbox[0] * video.videoWidth) - (width / 2);
-                                const y = (bbox[1] * video.videoHeight) - (height / 2);
-                                
-                                detections.push({
-                                    bbox:[x, y, width, height],
-                                    class: 'person',
-                                    score: finalScore
-                                });
-                            }
-                        }
-                    
-                        // console.log('Processed detections:', detections);
-                        return detections;
-                    } catch (error) {
-                        console.error('Error processing YOLO output:', error);
-                        throw error;
-                    }    
-                } catch (error) {
-                    console.error(`Detection error with ${modelType}:`, error);
-                    if (tensor) console.log('Tensor shape:', tensor?.shape);
-                    if (predictions) console.log('Predictions shape:', predictions?.shape);
-                    // If detection fails, try to recover by switching back to COCO-SSD
-                    if (modelType !== 'cocossd') {
-                        await switchModel('cocossd');
-                    }
-                    return [];
-                }finally {
-                    // Cleanup tensors
-                    if (modelType !== 'cocossd') {
-                        await switchModel('cocossd');
-                    }
-                    if (tensor) tensor.dispose();
-                    if (predictions) predictions.dispose();
-                    tf.engine().disposeVariables();
-                    // tf.engine().startScope();
-                }
-            }
+        // --- COCO Class Names ---
+        const COCO_CLASSES = {
+            1: 'bicycle', 2: 'car', 3: 'motorcycle', 4: 'asiatic rice borer', 5: 'yellow rice borer',
+            6: 'rice gall midge', 7: 'airplane', 8: 'brown plant hopper', 9: 'white backed plant hopper',
+            10: 'bus', 11: 'train', 12: 'truck', 13: 'boat', 14: 'traffic light', 15: 'fire hydrant',
+            16: 'stop sign', 17: 'parking meter', 18: 'bench', 19: 'bird', 20: 'cat', 21: 'dog',
+            22: 'horse', 23: 'sheep', 24: 'army worm', 25: 'aphids', 26: 'cow', 27: 'elephant',
+            28: 'bear', 29: 'zebra', 30: 'giraffe', 31: 'backpack', 32: 'umbrella', 33: 'handbag',
+            34: 'tie', 35: 'suitcase', 36: 'frisbee', 37: 'skis', 38: 'snowboard', 39: 'sports ball',
+            40: 'kite', 41: 'baseball bat', 42: 'baseball glove', 43: 'skateboard', 44: 'surfboard',
+            45: 'tennis racket', 46: 'bottle', 47: 'wine glass', 48: 'cup', 49: 'fork', 50: 'knife',
+            51: 'spoon', 52: 'bowl', 53: 'banana', 54: 'apple', 55: 'sandwich', 56: 'pieris canidia',
+            57: 'orange', 58: 'broccoli', 59: 'carrot', 60: 'hot dog', 61: 'pizza', 62: 'donut',
+            63: 'cake', 64: 'chair', 65: 'couch', 66: 'potted plant', 67: 'bed', 68: 'dining table',
+            69: 'toilet', 70: 'tv', 71: 'laptop', 72: 'mouse', 73: 'remote', 74: 'keyboard',
+            75: 'cell phone', 76: 'microwave', 77: 'oven', 78: 'toaster', 79: 'sink', 80: 'refrigerator',
+            81: 'book', 82: 'clock', 83: 'vase', 84: 'scissors', 85: 'teddy bear', 86: 'hair drier',
+            87: 'toothbrush', 88: '', 89: '', 90: '', 91: '', 92: 'scirtothrips dorsalis hood',
+            93: '', 94: '', 95: '', 96: '', 97: 'chlumetia transversa', 98: '', 99: '',
         };
-        // Add tensor cleanup helper function
-        function cleanupTensors() {
-            try {
-                const startingTensors = tf.memory().numTensors;
-                return () => {
-                    try {
-                        // Dispose of any remaining tensors
-                        const endingTensors = tf.memory().numTensors;
-                        if (endingTensors > startingTensors) {
-                            tf.disposeVariables();
-                        }
-                    } catch (e) {
-                        console.error('Tensor cleanup error:', e);
-                    }
-                };
-            } catch (e) {
-                console.error('Tensor scope error:', e);
-                return () => {};
-            }
-        }
 
-        // Initialize system
-        async function initialize() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { width: { ideal: 1280 }, height: { ideal: 720 } },
-                    audio: true
-                });
-                
-                video.srcObject = stream;
-                mediaRecorder = new MediaRecorder(stream);
-                mediaRecorder.ondataavailable = handleDataAvailable;
-                mediaRecorder.onstop = handleRecordingStop;
-                
-                // Load initial model
-                await switchModel('cocossd');
-                
-                document.getElementById('loadingOverlay').style.display = 'none';
-                updateStatus('active', 'System Ready');
-                // addActivity('System initialized');
-                
-                detectPerson();
-            } catch (error) {
-                console.error('Initialization error:', error);
-                updateStatus('error', 'System Error');
-                // addActivity(`Error: ${error.message}`);
-            }
-        }
-
-        async function switchModel(modelType) {
-            try {
-                document.getElementById('loadingOverlay').style.display = 'flex';
-                updateStatus('loading', 'Loading model...');
-                
-                // Cleanup previous model
-                if (modelInstance) {
-                    if (tf.engine().numTensors > 0) {
-                        tf.engine().disposeVariables();
-                    }
-                }
-                
-                modelInstance = await modelFactory.loadModel(modelType);
-                currentModel = modelType;
-                
-                document.getElementById('loadingOverlay').style.display = 'none';
-                updateStatus('active', `${modelType.toUpperCase()} model loaded`);
-                // addActivity(`Switched to ${modelType.toUpperCase()} model`);
-            } catch (error) {
-                console.error('Model switch error:', error);
-                updateStatus('error', 'Model loading failed');
-                // addActivity(`Error loading ${modelType.toUpperCase()} model`);
-                
-                // Fallback to COCO-SSD if YOLO models fail
-                if (modelType !== 'cocossd') {
-                    await switchModel('cocossd');
-                }
-            }
-        }
-        // Person detection function
-        async function detectPerson() {
-            if (modelInstance && video.readyState === 4) {
-                const cleanup = cleanupTensors();
-            try {
-                const predictions = await modelFactory.detect(currentModel, video);
+        /** Loads a specified TensorFlow.js GraphModel. */
+        async function loadModel(name) {
+            if (isDetectionRunning) { stopDetectionLoop(); }
+            addStatusLog(`Switching to ${name}...`);
+            console.log(`Loading model: ${name}`);
+            updateLoadingProgress('Preparing...');
             
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
+            detectionStatusDiv.textContent = 'Status: Idle';
+            detectionStatusDiv.className = 'detection-status';
+            isDetecting = false; lastSnapshotTime = 0; lastDetectedClassesSet = null;
+            startStopBtn.disabled = true; modelSelect.disabled = true;
+
+            if (currentModel) {
+                console.log("Disposing previous model...");
+                addStatusLog(`Disposing previous model...`);
+                await new Promise(resolve => setTimeout(resolve, 50));
+                try { currentModel.dispose(); currentModel = null; } catch (e) { console.error("Error disposing model:", e); }
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
+            }
 
-                let personDetected = false;
-                // console.log(`${currentModel} predictions:`, predictions);
-                        
-                predictions.forEach(prediction => {
-                    if (prediction.class === 'person') {
-                        personDetected = true;
-                        lastPersonDetectionTime = Date.now();
-                        const [x, y, width, height] = prediction.bbox;
-                        
-                        // Draw bounding box
-                        ctx.strokeStyle = '#00ff00';
-                        ctx.lineWidth = 2;
-                        ctx.strokeRect(x, y, width, height);
-                        
-                        // Draw label
-                        ctx.fillStyle = '#00ff00';
-                        ctx.font = '16px Arial';
-                        ctx.fillText(
-                            `Person ${Math.round(prediction.score * 100)}%`,
-                            x, y > 20 ? y - 5 : 20
-                        );
+            addStatusLog(`Initializing TFJS backend...`);
+            updateLoadingProgress('Initializing Backend...');
+            await new Promise(resolve => setTimeout(resolve, 50));
+            await tf.ready();
+            try { await tf.setBackend('webgl'); await tf.ready(); console.log("Using WebGL backend."); }
+            catch (e) {
+                console.warn("WebGL backend failed, falling back to CPU.", e);
+                try { await tf.setBackend('cpu'); await tf.ready(); console.log("Using CPU backend."); }
+                catch (cpuError) { console.error("CPU backend also failed:", cpuError); addStatusLog("TFJS Backend Error."); return false; }
+            }
 
-                        // Handle auto-recording
-                        if (autoRecordEnabled && !isRecording) {
-                            console.log('Starting auto-record...'); 
-                            startRecording();
-                            sendEmail(`Person detected at ${moment().format('YYYY-MM-DD HH:mm:ss')}`);
-                        }
-                        
-                        // Clear the no-person timeout
-                        if (noPersonTimeout) {
-                            clearTimeout(noPersonTimeout);
-                            noPersonTimeout = null;
-                        }
-                    }
+            const modelPath = `./${name}_web_model_insect/model.json`;
+            console.log(`Model path: ${modelPath}`);
+            addStatusLog(`Loading ${name} model...`);
+            updateLoadingProgress('Loading Model...');
+
+            try {
+                currentModel = await tf.loadGraphModel(modelPath);
+                console.log(`${name} model loaded successfully.`);
+                addStatusLog(`Warming up ${name}...`);
+                updateLoadingProgress('Warming Up...');
+                await new Promise(resolve => setTimeout(resolve, 100));
+                console.time(`Warm-up ${name}`);
+                tf.tidy(() => {
+                    const dummyInput = tf.zeros([1, INPUT_HEIGHT, INPUT_WIDTH, 3], 'float32');
+                    const dummyOutput = currentModel.execute(dummyInput);
+                    if (Array.isArray(dummyOutput)) { dummyOutput.forEach(t => t.dispose()); } else if (dummyOutput) { dummyOutput.dispose(); }
+                });
+                console.timeEnd(`Warm-up ${name}`);
+                updateLoadingProgress('Complete', 100);
+                addStatusLog(`${name} model ready. Select 'Start Detecting'.`);
+                console.log(`${name} model initialized and warmed up.`);
+                modelName = name;
+                startStopBtn.disabled = false; modelSelect.disabled = false;
+                return true;
+            } catch (error) {
+                updateLoadingProgress('Error', 100);
+                addStatusLog(`Error loading/warming ${name}. Check console.`);
+                console.error(`Failed to load model (${name} from ${modelPath}):`, error);
+                currentModel = null; startStopBtn.disabled = true; modelSelect.disabled = false;
+                return false;
+            }
+        }
+
+        /** Sets up the webcam stream. */
+        async function setupWebcam() {
+             return new Promise((resolve, reject) => {
+                if (!navigator.mediaDevices?.getUserMedia) { reject('Browser does not support getUserMedia API.'); return; }
+                navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 640 }, height: { ideal: 640 }, facingMode: 'user' }, audio: false })
+                .then(stream => {
+                    video.srcObject = stream;
+                    video.addEventListener('loadedmetadata', () => {
+                        canvas.width = video.videoWidth;
+                        canvas.height = video.videoHeight;
+                        console.log(`Webcam stream started: ${video.videoWidth}x${video.videoHeight}`);
+                        resolve();
+                    }, { once: true });
+                     video.addEventListener('error', (e) => { reject(`Webcam video error: ${e.message || 'Unknown error'}`); });
+                })
+                .catch(err => {
+                    console.error("getUserMedia error:", err);
+                    let errorMsg = `Webcam Access Error: ${err.name}`;
+                    if (err.name === 'NotAllowedError') { errorMsg = 'Webcam permission denied.'; }
+                    else if (err.name === 'NotFoundError') { errorMsg = 'No webcam found.'; }
+                    reject(errorMsg);
+                });
+            });
+        }
+
+        /** Initiates the object detection loop. */
+        function startDetectionLoop() {
+            if (!currentModel) { console.warn("Cannot start: No model loaded."); addStatusLog("Load a model first."); return; }
+            if (video.paused || video.ended || video.readyState < 4) { console.warn("Cannot start: Video stream not ready."); addStatusLog("Waiting for video stream..."); return; }
+            if (isDetectionRunning) { console.log("Detection is already running."); return; }
+            console.log("Starting detection loop via button...");
+            isDetectionRunning = true;
+            addStatusLog(`Detecting objects (${modelName})...`);
+            detectFrame();
+        }
+
+        /** Stops the object detection loop. */
+        function stopDetectionLoop() {
+            if (!isDetectionRunning && !isDetecting && !rafId) { console.log("Detection loop already stopped."); return; }
+            console.log("Stopping detection loop...");
+            isDetectionRunning = false;
+            if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+            isDetecting = false;
+            addStatusLog("Detection stopped.");
+            updateDetectionStatus(false, false, true); // Reset status indicator to Idle
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            startStopBtn.innerHTML = '<span class="material-icons-round">play_arrow</span><span class="btn-text">Start Detecting</span>';
+            startStopBtn.className = 'start btn-effect';
+            modelSelect.disabled = false;
+        }
+
+        /**
+         * Processes the raw output tensor from the YOLO model.
+         * **REVISED** to normalize coordinates after conversion.
+         */
+        async function processDetections(predictionsTensor) {
+            const finalBoxes = []; const finalScores = []; const finalClassIds = [];
+            let tensorsToDispose = [];
+
+            try {
+                const transposedPreds = predictionsTensor.transpose([0, 2, 1]);
+                tensorsToDispose.push(transposedPreds);
+                const squeezedPreds = tf.squeeze(transposedPreds);
+                tensorsToDispose.push(squeezedPreds);
+
+                // Assume boxes_cxywh contains pixel coordinates relative to INPUT_WIDTH, INPUT_HEIGHT
+                const boxes_cxywh = squeezedPreds.slice([0, 0], [-1, 4]);
+                const numClasses = squeezedPreds.shape[1] - 4;
+                const classes = squeezedPreds.slice([0, 4], [-1, numClasses]);
+                tensorsToDispose.push(boxes_cxywh, classes);
+                const maxScores = tf.max(classes, 1);
+                const classIdsTensor = tf.argMax(classes, 1);
+                tensorsToDispose.push(maxScores, classIdsTensor);
+
+                const scoresArray = await maxScores.array();
+                const filteredIndices = scoresArray
+                    .map((score, index) => score > SCORE_THRESHOLD ? index : -1)
+                    .filter(index => index !== -1);
+
+                if (filteredIndices.length === 0) {
+                    console.log("No detections above score threshold."); // Debug log
+                    return { boxes: [], scores: [], classIds: [] };
+                }
+
+                const filteredIndicesTensor = tf.tensor1d(filteredIndices, 'int32');
+                tensorsToDispose.push(filteredIndicesTensor);
+                const boxes_cxywh_filtered = boxes_cxywh.gather(filteredIndicesTensor);
+                const scores_filtered = maxScores.gather(filteredIndicesTensor);
+                const classIds_filtered = classIdsTensor.gather(filteredIndicesTensor);
+                tensorsToDispose.push(boxes_cxywh_filtered, scores_filtered, classIds_filtered);
+
+                // --- Convert boxes from [cx, cy, w, h] (pixel coords) to [y1, x1, y2, x2] (pixel coords) ---
+                const [cx, cy, w, h] = tf.unstack(boxes_cxywh_filtered, 1);
+                const x1 = tf.sub(cx, tf.div(w, 2));
+                const y1 = tf.sub(cy, tf.div(h, 2));
+                const x2 = tf.add(cx, tf.div(w, 2));
+                const y2 = tf.add(cy, tf.div(h, 2));
+                tensorsToDispose.push(cx, cy, w, h, x1, y1, x2, y2); // Keep pixel coords tensors for disposal
+
+                // --- Normalize Box Coordinates [y1, x1, y2, x2] to [0, 1] range ---
+                const norm_y1 = tf.div(y1, INPUT_HEIGHT);
+                const norm_x1 = tf.div(x1, INPUT_WIDTH);
+                const norm_y2 = tf.div(y2, INPUT_HEIGHT);
+                const norm_x2 = tf.div(x2, INPUT_WIDTH);
+
+                // Stack the *normalized* coordinates for NMS
+                const nmsBoxesNormalized = tf.stack([norm_y1, norm_x1, norm_y2, norm_x2], 1);
+                tensorsToDispose.push(norm_y1, norm_x1, norm_y2, norm_x2, nmsBoxesNormalized);
+                // --- End Normalization ---
+
+                // Perform Non-Maximum Suppression (NMS) using the *normalized* boxes
+                const selectedIndicesTensor = await tf.image.nonMaxSuppressionAsync(
+                    nmsBoxesNormalized, // Use normalized boxes
+                    scores_filtered,
+                    MAX_DETECTIONS,
+                    NMS_THRESHOLD,
+                    SCORE_THRESHOLD
+                );
+                tensorsToDispose.push(selectedIndicesTensor);
+                const selectedIndices = await selectedIndicesTensor.array();
+
+                // Get the final *normalized* boxes kept by NMS
+                const finalBoxesDataNormalized = await nmsBoxesNormalized.gather(selectedIndicesTensor).array();
+                const finalScoresData = await scores_filtered.gather(selectedIndicesTensor).array();
+                const finalClassIdsData = await classIds_filtered.gather(selectedIndicesTensor).array();
+
+                // Populate final results using the normalized data
+                for (let i = 0; i < selectedIndices.length; i++) {
+                    const classId = finalClassIdsData[i];
+                    const score = finalScoresData[i];
+                    const box_yxyx_norm = finalBoxesDataNormalized[i]; // Box is already [y1, x1, y2, x2] normalized
+
+                    // Clamp coordinates to [0, 1] range (good practice)
+                    const [y1_norm, x1_norm, y2_norm, x2_norm] = box_yxyx_norm;
+                    finalBoxes.push([
+                        Math.max(0, y1_norm), Math.max(0, x1_norm),
+                        Math.min(1, y2_norm), Math.min(1, x2_norm)
+                    ]);
+                    finalScores.push(score);
+                    finalClassIds.push(classId);
+                }
+
+                console.log("Final Detections:", { boxes: finalBoxes, scores: finalScores, classIds: finalClassIds }); // Debug log (still active)
+                return { boxes: finalBoxes, scores: finalScores, classIds: finalClassIds };
+
+            } catch(error) {
+                console.error("Error during detection processing:", error);
+                return { boxes: [], scores: [], classIds: [] };
+            } finally {
+                tf.dispose(tensorsToDispose);
+            }
+        }
+
+
+        /** Helper function to compare two Sets for equality. */
+        function areSetsEqual(setA, setB) {
+            if (!setA || !setB) return false;
+            if (setA.size !== setB.size) return false;
+            for (const item of setA) { if (!setB.has(item)) return false; }
+            return true;
+        }
+
+        /** Performs object detection on a single video frame. */
+        async function detectFrame() {
+             if (!isDetectionRunning || !currentModel || video.paused || video.ended || video.readyState < 3) {
+                console.log("Stopping detection frame processing (loop stopped, no model, or video issue).");
+                stopDetectionLoop(); return;
+            }
+            if (isDetecting) { rafId = requestAnimationFrame(detectFrame); return; }
+            isDetecting = true; rafId = null;
+            let predictions;
+
+            try {
+                [/* inputTensor disposed by tidy */, predictions] = tf.tidy(() => {
+                    const imgTensor = tf.browser.fromPixels(video);
+                    const resizedTensor = tf.image.resizeBilinear(imgTensor.toFloat(), [INPUT_HEIGHT, INPUT_WIDTH]);
+                    const normalizedTensor = resizedTensor.div(255.0);
+                    const batchedInput = normalizedTensor.expandDims(0);
+                    return [null, currentModel.execute(batchedInput)];
                 });
 
-                if (!personDetected && isRecording) {
-                    // Set timeout to stop recording after 5 seconds of no person detected
-                    if (!noPersonTimeout) {
-                        noPersonTimeout = setTimeout(() => {
-                            if (isRecording) {
-                                stopRecording();
-                                // addActivity('Recording stopped - No person detected for 5 seconds');
-                            }
-                        }, 5000);
+                const rawOutputTensor = Array.isArray(predictions) ? predictions[0] : predictions;
+                if (!rawOutputTensor) { console.warn("Model execution returned null output."); return; }
+
+                const { boxes: finalBoxes, scores: finalScores, classIds: finalClassIds } = await processDetections(rawOutputTensor);
+
+                // Data passed to drawBoundingBoxes log is still active
+                console.log("Data passed to drawBoundingBoxes:", { finalBoxes, finalScores, finalClassIds });
+
+                drawBoundingBoxes(finalBoxes, finalScores, finalClassIds);
+
+                // --- Status Update & Snapshot Trigger Logic ---
+                const detectedObjects = finalBoxes.length > 0;
+                const currentTime = Date.now();
+                const currentClassesSet = new Set(finalClassIds);
+                const targetDetected = finalClassIds.some(id => TARGET_CLASS_IDS.has(id));
+
+                updateDetectionStatus(targetDetected, !detectedObjects);
+
+                if (targetDetected) {
+                    const timeElapsedSinceLastSnapshot = currentTime - lastSnapshotTime;
+                    const classesChangedSinceLastSnapshot = !areSetsEqual(currentClassesSet, lastDetectedClassesSet);
+                    if (timeElapsedSinceLastSnapshot >= SNAPSHOT_MIN_INTERVAL_MS) {
+                        if (classesChangedSinceLastSnapshot || lastDetectedClassesSet === null) {
+                            const detectedTargetClasses = finalClassIds
+                                .filter(id => TARGET_CLASS_IDS.has(id))
+                                .map(id => COCO_CLASSES[id] || `ID ${id}`);
+                            const reason = `Target insect(s) detected: ${detectedTargetClasses.join(', ')}`;
+                            console.log(`Triggering snapshot. Reason: ${lastDetectedClassesSet === null ? 'Initial detection' : 'Classes changed'} & time threshold met. Detected: ${detectedTargetClasses.join(', ')}`);
+                            takeSnapshot(finalBoxes, reason);
+                            lastSnapshotTime = currentTime;
+                            lastDetectedClassesSet = currentClassesSet;
+                        }
                     }
                 }
-                } catch (error) {
-                    console.error('Detection error:', error);
-                }finally {
-                    cleanup(); // Ensure tensors are cleaned up
-                }
-            }
-            requestAnimationFrame(detectPerson);
-        }
 
-        // Recording handlers
-        function handleDataAvailable(event) {
-            if (event.data.size > 0) {
-                recordedChunks.push(event.data);
-            }
-        }
-
-        function handleRecordingStop() {
-            const blob = new Blob(recordedChunks, { type: 'video/webm' });
-            recordedChunks = [];
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            const timestamp = moment().format('YYYY-MM-DD-HH-mm-ss');
-            a.href = url;
-            a.download = `security-recording-${timestamp}.webm`;
-            a.click();
-            URL.revokeObjectURL(url);
-        }
-
-        function startRecording() {
-            if (mediaRecorder && mediaRecorder.state === 'inactive') {
-                recordedChunks = [];
-                mediaRecorder.start();
-                isRecording = true;
-                recordingStartTime = Date.now();
-                timerInterval = setInterval(updateTimer, 1000);
-                document.getElementById('recordBtn').classList.add('active');
-                updateStatus('active', 'Recording');
-                // addActivity('Recording started');
+            } catch (error) {
+                console.error("Error during detection frame:", error);
+                addStatusLog("Detection Error. Stopping.");
+                stopDetectionLoop();
+            } finally {
+                 if (predictions) {
+                     if (Array.isArray(predictions)) { predictions.forEach(t => t?.dispose()); }
+                     else { predictions?.dispose(); }
+                 }
+                 isDetecting = false;
+                 if (isDetectionRunning && currentModel && !video.paused && !video.ended) {
+                     rafId = requestAnimationFrame(detectFrame);
+                 } else if (isDetectionRunning) {
+                     console.log("Video stopped/paused/ended unexpectedly. Stopping loop.");
+                     stopDetectionLoop();
+                 }
             }
         }
 
-        function stopRecording() {
-            if (mediaRecorder && mediaRecorder.state === 'recording') {
-                mediaRecorder.stop();
-                isRecording = false;
-                recordingStartTime = null;
-                clearInterval(timerInterval);
-                updateTimer();
-                document.getElementById('recordBtn').classList.remove('active');
-                updateStatus('active', 'System Ready');
-                // addActivity('Recording stopped');
-            }
-        }
 
-        // Timer update function
-        function updateTimer() {
-            const timer = document.getElementById('timer');
-            if (!recordingStartTime) {
-                timer.textContent = '00:00:00';
+        /** Draws bounding boxes and labels on the canvas overlay. */
+        function drawBoundingBoxes(boxes, scores, classIds) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (!boxes || boxes.length === 0) {
+                console.log("drawBoundingBoxes called with no boxes."); // Debug log
                 return;
             }
-            const elapsed = Date.now() - recordingStartTime;
-            const time = new Date(elapsed);
-            timer.textContent = time.toISOString().substr(11, 8);
+            const colors = ['#00FF00', '#FF0000', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF', '#FFA500', '#800080'];
+            ctx.lineWidth = 2; ctx.font = '14px Arial';
+
+            boxes.forEach((box, i) => {
+                const classId = classIds[i];
+                const className = COCO_CLASSES[classId] || `ID ${classId}`;
+                const color = colors[classId % colors.length];
+                ctx.strokeStyle = color; ctx.fillStyle = color;
+                // Expecting normalized coords here now
+                const [y1Norm, x1Norm, y2Norm, x2Norm] = box;
+
+                // Debug log for individual box coordinates (still active)
+                console.log(`Box ${i}: ID=${classId}, Score=${scores[i].toFixed(2)}, CoordsNorm=[${y1Norm.toFixed(2)}, ${x1Norm.toFixed(2)}, ${y2Norm.toFixed(2)}, ${x2Norm.toFixed(2)}]`);
+
+                const x = x1Norm * canvas.width;
+                const y = y1Norm * canvas.height;
+                const width = (x2Norm - x1Norm) * canvas.width;
+                const height = (y2Norm - y1Norm) * canvas.height;
+
+                // Debug log for calculated canvas coordinates (still active)
+                console.log(`  -> Canvas Coords: x=${x.toFixed(1)}, y=${y.toFixed(1)}, w=${width.toFixed(1)}, h=${height.toFixed(1)}`);
+
+                const validWidth = Math.max(0, width);
+                const validHeight = Math.max(0, height);
+
+                if (validWidth > 0 && validHeight > 0) {
+                    ctx.strokeRect(x, y, validWidth, validHeight);
+                    const scoreText = `${className}: ${(scores[i] * 100).toFixed(1)}%`;
+                    const textWidth = ctx.measureText(scoreText).width;
+                    const textHeight = parseInt(ctx.font, 10);
+                    ctx.fillRect(x, y - (textHeight + 4), textWidth + 4, textHeight + 4);
+                    ctx.fillStyle = '#000000';
+                    ctx.fillText(scoreText, x + 2, y - 4);
+                } else {
+                    // console.warn(`Skipping drawing box ${i} due to zero/negative dimensions: w=${width}, h=${height}`);
+                }
+            });
         }
 
-        // Status update function
-        function updateStatus(state, text) {
-            state='active';
-            const statusDot = document.getElementById('statusDot');
-            const statusText = document.getElementById('statusText');
-            statusDot.className = `status-dot ${state}`;
-            statusText.textContent = "System Active";
-        }
-
-        // Activity log function
-        // function addActivity(message) {
-        //     const container = document.getElementById('activityContainer');
-        //     const time = moment().format('HH:mm:ss');
-        //     const activityHtml = `
-        //         <div class="activity-item">
-        //             <div class="activity-time">${time}</div>
-        //             ${message}
-        //         </div>
-        //     `;
-        //     container.insertAdjacentHTML('afterbegin', activityHtml);
-        // }
-
-        // Screenshot function
-        function takeSnapshot() {
-            const timestamp = moment().format('YYYY-MM-DD-HH-mm-ss');
-            const snapshotCanvas = document.createElement('canvas');
-            snapshotCanvas.width = video.videoWidth;
-            snapshotCanvas.height = video.videoHeight;
-            const snapshotCtx = snapshotCanvas.getContext('2d');
-            
-            if (mirrored) {
-                snapshotCtx.scale(-1, 1);
-                snapshotCtx.translate(-video.videoWidth, 0);
+        /** Updates the detection status indicator element's text and style. */
+        function updateDetectionStatus(isTargetDetected, noObjectsDetected, reset = false) {
+            if (reset) {
+                detectionStatusDiv.textContent = 'Status: Idle';
+                detectionStatusDiv.className = 'detection-status';
+                return;
             }
-            
-            snapshotCtx.drawImage(video, 0, 0);
-            snapshotCtx.drawImage(canvas, 0, 0);
-            
-            const link = document.createElement('a');
-            link.download = `security-snapshot-${timestamp}.png`;
-            link.href = snapshotCanvas.toDataURL('image/png');
-            link.click();
-            
-            // addActivity('Snapshot captured');
+            if (isTargetDetected) {
+                detectionStatusDiv.textContent = 'Status: Target Insect Detected!';
+                detectionStatusDiv.className = 'detection-status target-detected';
+            }
+            else if (!noObjectsDetected) {
+                 detectionStatusDiv.textContent = 'Status: Non-Target Object Detected';
+                 detectionStatusDiv.className = 'detection-status non-target-detected';
+            }
+            else {
+                detectionStatusDiv.textContent = 'Status: No Objects Detected';
+                detectionStatusDiv.className = 'detection-status no-objects';
+            }
         }
 
-        // Event listeners
-        document.getElementById('photoBtn').addEventListener('click', takeSnapshot);
-        // Add model selector event listener
-        document.getElementById('modelSelector').addEventListener('change', async (e) => {
-            await switchModel(e.target.value);
-        });
-        document.getElementById('recordBtn').addEventListener('click', () => {
-            if (isRecording) {
-                stopRecording();
+        /** Displays a temporary notification message (e.g., for email status). */
+        function showNotification(message, isError = false) {
+            const notificationEl = emailNotificationDiv;
+            const iconEl = notificationEl.querySelector('.notification-icon');
+            const textEl = notificationEl.querySelector('.notification-text');
+            
+            // Update content
+            textEl.textContent = message;
+            
+            // Update icon and class
+            if (isError) {
+                notificationEl.classList.add('error');
+                iconEl.textContent = 'error';
+                iconEl.classList.remove('success-icon');
+                iconEl.classList.add('error-icon');
             } else {
-                startRecording();
+                notificationEl.classList.remove('error');
+                iconEl.textContent = 'check_circle';
+                iconEl.classList.remove('error-icon');
+                iconEl.classList.add('success-icon');
+            }
+            
+            // Show notification with animation
+            notificationEl.classList.remove('slide-out');
+            notificationEl.classList.add('slide-in');
+            notificationEl.style.display = 'flex';
+            
+            // Hide after delay
+            setTimeout(() => {
+                notificationEl.classList.remove('slide-in');
+                notificationEl.classList.add('slide-out');
+                
+                // After animation completes, hide element
+                setTimeout(() => {
+                    notificationEl.style.display = 'none';
+                }, 500);
+            }, 3000);
+        }
+
+        /** Takes snapshot, uploads, sends email. */
+        async function takeSnapshot(boxesToDraw, reason = "Target insect detected") {
+            console.log(`Processing snapshot. Reason: ${reason}`);
+            if (noSnapshotsMsg) noSnapshotsMsg.style.display = 'none';
+
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = video.videoWidth; tempCanvas.height = video.videoHeight;
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCtx.drawImage(video, 0, 0, tempCanvas.width, tempCanvas.height);
+
+            if (boxesToDraw?.length > 0) {
+                tempCtx.strokeStyle = '#FF0000'; tempCtx.lineWidth = 2;
+                boxesToDraw.forEach(box => {
+                    // Expecting normalized coords here now
+                    const [y1Norm, x1Norm, y2Norm, x2Norm] = box;
+                    const x = x1Norm * tempCanvas.width; const y = y1Norm * tempCanvas.height;
+                    const width = (x2Norm - x1Norm) * tempCanvas.width; const height = (y2Norm - y1Norm) * tempCanvas.height;
+                    tempCtx.strokeRect(x, y, Math.max(0, width), Math.max(0, height));
+                });
+            }
+
+            const imageDataUrl = tempCanvas.toDataURL('image/jpeg', 0.9);
+            const snapshotDiv = document.createElement('div');
+            snapshotDiv.classList.add('snapshot');
+            const img = document.createElement('img');
+            img.src = imageDataUrl; img.alt = "Detection snapshot";
+            const downloadLink = document.createElement('a');
+            downloadLink.href = imageDataUrl;
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            downloadLink.download = `snapshot_${timestamp}.jpg`;
+            downloadLink.textContent = 'Save';
+            snapshotDiv.appendChild(img); snapshotDiv.appendChild(downloadLink);
+            snapshotGallery.insertBefore(snapshotDiv, snapshotGallery.firstChild);
+
+            const maxSnapshots = 20;
+            const snapshotNodes = snapshotGallery.querySelectorAll('.snapshot');
+             while (snapshotNodes.length > maxSnapshots && snapshotGallery.lastChild?.classList.contains('snapshot')) {
+                 snapshotGallery.removeChild(snapshotGallery.lastChild);
+             }
+
+            // --- Email Sending Logic (with Cooldown) ---
+            const currentTime = Date.now();
+            if (currentTime - lastNotificationTime < EMAIL_COOLDOWN_MS) {
+                const remainingCooldown = ((EMAIL_COOLDOWN_MS - (currentTime - lastNotificationTime))/1000).toFixed(1);
+                console.log(`Email skipped: Cooldown active. (${remainingCooldown}s remaining)`);
+                return;
+            }
+
+            console.log("Attempting to upload snapshot and send email...");
+            try {
+                const imageBlob = await new Promise(resolve => { tempCanvas.toBlob(resolve, 'image/jpeg', 0.7); });
+                if (!imageBlob) throw new Error("Failed to create image blob.");
+                const formData = new FormData();
+                formData.append('image', imageBlob);
+
+                console.log("Uploading to ImgBB...");
+                const imgbbResponse = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, { method: 'POST', body: formData });
+                const imgbbData = await imgbbResponse.json();
+
+                if (imgbbData.success && imgbbData.data.url) {
+                    const imageUrl = imgbbData.data.url;
+                    console.log('Image uploaded successfully:', imageUrl);
+                    console.log("Sending email via EmailJS...");
+                    await emailjs.send( EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+                            to_email: "<YOUR MAIL>", // ** HARDCODED RECIPIENT **
+                            message: `${reason}. Snapshot captured at ${new Date().toLocaleString()}. View image: ${imageUrl}`,
+                            image_url: imageUrl
+                    });
+                    console.log('Email sent successfully via EmailJS.');
+                    showNotification('Email sent with snapshot!');
+                    lastNotificationTime = currentTime;
+                } else {
+                    throw new Error(`ImgBB upload failed: ${imgbbData.error?.message || 'Unknown error'}`);
+                }
+            } catch (error) {
+                console.error('Failed to upload image or send email:', error);
+                showNotification(`Error: ${error.message || 'Failed to send snapshot email.'}`, true);
+            }
+        }
+
+
+        // --- Event Listeners Setup ---
+        modelSelect.addEventListener('change', async (event) => {
+             const newModelName = event.target.value;
+            if (newModelName !== modelName) {
+                console.log(`User selected model: ${newModelName}`);
+                await loadModel(newModelName);
             }
         });
 
-        document.getElementById('autoRecordBtn').addEventListener('click', () => {
-            autoRecordEnabled = !autoRecordEnabled;
-            document.getElementById('autoRecordBtn').classList.toggle('active');
-            // addActivity(autoRecordEnabled ? 'Auto-record enabled' : 'Auto-record disabled');
-        });
-
-        document.getElementById('mirrorBtn').addEventListener('click', () => {
-            mirrored = !mirrored;
-            video.style.transform = mirrored ? 'scaleX(-1)' : '';
-            canvas.style.transform = mirrored ? 'scaleX(-1)' : '';
-            // addActivity(mirrored ? 'Camera view mirrored' : 'Camera view normal');
-        });
-
-        // Handle page unload
-        window.addEventListener('beforeunload', () => {
-            if (isRecording) {
-                stopRecording();
+        startStopBtn.addEventListener('click', () => {
+            if (isDetectionRunning) {
+                stopDetectionLoop();
+            } else {
+                startDetectionLoop();
+                if (isDetectionRunning) {
+                    startStopBtn.innerHTML = '<span class="material-icons-round">stop</span><span class="btn-text">Stop Detecting</span>';
+                    startStopBtn.className = 'stop btn-effect';
+                    modelSelect.disabled = false;
+                }
             }
+        });
+
+        window.addEventListener('load', async () => {
+            addStatusLog("Initializing application...");
+            try {
+                addStatusLog("Requesting Webcam Access...");
+                await setupWebcam();
+                addStatusLog("Webcam ready. Loading initial model...");
+                const initialModelName = modelSelect.value;
+                const loaded = await loadModel(initialModelName);
+                if (!loaded) {
+                    const errorMsg = `Failed to load initial model: ${initialModelName}. Try selecting another model.`;
+                    addStatusLog(errorMsg);
+                    startStopBtn.disabled = true; modelSelect.disabled = false; alert(errorMsg);
+                } else {
+                     addStatusLog("Ready. Press 'Start Detecting'.");
+                }
+            } catch (error) {
+                const errorMsg = `Initialization Error: ${error}`;
+                addStatusLog(errorMsg); console.error("Initialization failed:", error); alert(`Error initializing: ${error}`);
+                startStopBtn.disabled = true; modelSelect.disabled = true;
+            }
+        });
+
+        document.addEventListener('visibilitychange', () => {
+            if (!currentModel || !video.srcObject) return;
+            if (document.hidden) {
+                if (isDetectionRunning) { console.log("Page hidden. Stopping detection."); stopDetectionLoop(); }
+            } else {
+                console.log("Page visible.");
+                if (!isDetectionRunning && currentModel) { addStatusLog("Ready. Press 'Start Detecting'."); }
+            }
+        });
+
+        // --- New Event Listeners for UI Components ---
+        // Toggle gallery visibility
+        document.getElementById('gallery-toggle').addEventListener('click', () => {
+            const gallerySection = document.getElementById('gallery-section');
+            gallerySection.classList.toggle('visible');
+        });
+
+        // Close gallery
+        document.getElementById('gallery-close').addEventListener('click', () => {
+            document.getElementById('gallery-section').classList.remove('visible');
+        });
+
+        // Theme toggle
+        document.getElementById('theme-switch').addEventListener('change', function() {
+            document.body.classList.toggle('dark-mode');
+            document.body.classList.toggle('light-mode');
         });
     </script>
 </body>
+</html>
