@@ -3,14 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Webcam Object Detector (YOLO - execute())</title> <!-- Title updated -->
-    <!-- Load TensorFlow.js -->
+    <title>Webcam Insect Detector (Target Classes Only)</title>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js"></script>
-    <!-- Optional: Load WebGL backend for performance -->
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl@4.17.0/dist/tf-backend-webgl.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
 
     <style>
-        /* CSS remains the same as the previous version */
+        /* Basic styling for layout and appearance */
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             display: flex;
@@ -26,30 +25,32 @@
             margin-bottom: 15px;
             text-align: center;
         }
+        /* Container for video and canvas */
         .container {
             position: relative;
-            width: 640px; /* Default Width */
+            width: 640px; /* Default width */
             max-width: 95%; /* Responsive */
             border: 1px solid #ccc;
             box-shadow: 0 4px 8px rgba(0,0,0,0.1);
             background-color: #fff;
-            margin-bottom: 15px; /* Space before controls */
-            overflow: hidden; /* Contain canvas */
+            margin-bottom: 15px;
+            overflow: hidden; /* Keep canvas inside */
             border-radius: 4px;
         }
         #video {
-            display: block;
+            display: block; /* Remove extra space below video */
             width: 100%;
-            height: auto;
+            height: auto; /* Maintain aspect ratio */
         }
         #canvas {
-           position: absolute;
-           top: 0;
-           left: 0;
-           width: 100%;
-           height: 100%;
-           z-index: 10;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10; /* Draw on top of video */
         }
+        /* Controls section styling */
         .controls {
             padding: 10px 15px;
             background-color: #eee;
@@ -58,33 +59,64 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            flex-wrap: wrap;
-            gap: 10px;
-            width: 640px;
+            flex-wrap: wrap; /* Allow wrapping on smaller screens */
+            gap: 10px; /* Space between items */
+            width: 640px; /* Match container width */
             max-width: 95%;
-            box-sizing: border-box;
+            box-sizing: border-box; /* Include padding/border in width */
+            margin-bottom: 10px; /* Added margin */
         }
         .control-group {
             display: flex;
             align-items: center;
             gap: 5px;
         }
-        .controls label {
+        .controls label { /* Shared style */
             font-size: 0.9em;
             font-weight: bold;
         }
-        .controls select {
+        .controls select { /* Shared style */
             padding: 5px 8px;
             border: 1px solid #ccc;
             border-radius: 3px;
             font-size: 0.9em;
         }
+        /* Start/Stop Button Styling */
+        #start-stop-btn {
+            padding: 10px 20px;
+            font-size: 1em;
+            font-weight: bold;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease, color 0.3s ease;
+            width: 640px; /* Match container width */
+            max-width: 95%;
+            box-sizing: border-box;
+            margin-top: 5px; /* Space below controls */
+            margin-bottom: 15px;
+        }
+        #start-stop-btn.start {
+            background-color: #28a745; /* Green */
+            color: white;
+        }
+        #start-stop-btn.stop {
+            background-color: #dc3545; /* Red */
+            color: white;
+        }
+         #start-stop-btn:disabled {
+             background-color: #cccccc;
+             color: #666666;
+             cursor: not-allowed;
+         }
+
+        /* Status message styling */
         #status {
             font-size: 1em;
             font-weight: bold;
             color: #555;
-            margin: 15px 0 5px 0;
-            min-height: 1.2em;
+            margin: 15px 0 5px;
+            min-height: 1.2em; /* Prevent layout shifts */
             text-align: center;
             width: 100%;
             padding: 8px;
@@ -93,43 +125,58 @@
             max-width: 640px;
             box-sizing: border-box;
         }
-         #detection-status {
+        /* Detection status indicator styling */
+        #detection-status {
             font-weight: bold;
             padding: 6px 12px;
             border-radius: 4px;
-            background-color: #d3d3d3; /* Grey - default (Idle) */
+            background-color: #d3d3d3; /* Default: Idle */
             color: #333;
             transition: background-color 0.3s ease, color 0.3s ease;
             font-size: 0.9em;
             text-align: center;
-            flex-grow: 1;
-            margin-left: 10px;
+            flex-grow: 1; /* Take available space */
+            margin-left: 10px; /* Space from model select */
         }
-        #detection-status.human-detected {
-            background-color: #28a745; /* Green */
-            color: white;
-        }
-        #detection-status.objects-detected {
-             background-color: #17a2b8; /* Cyan Info */
-             color: white;
-         }
-        #detection-status.no-objects {
-            background-color: #ffc107; /* Yellow Warning */
-            color: #333;
-        }
+        /* Highlight target insect detection */
+        #detection-status.target-detected { background-color: #dc3545; color: #fff; } /* Red for alert */
+        /* Status for when objects are detected, but not the target ones */
+        #detection-status.non-target-detected { background-color: #17a2b8; color: #fff; } /* Info blue */
+        /* No objects detected status */
+        #detection-status.no-objects { background-color: #ffc107; color: #333; } /* Warning yellow */
 
-         #snapshot-gallery {
+        /* Email Notification Styling */
+        #emailNotification {
+            display: none; /* Hidden by default */
+            position: fixed; /* Or absolute depending on layout */
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #28a745; /* Success green */
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            z-index: 1000; /* Ensure it's on top */
+            font-size: 0.9em;
+        }
+         #emailNotification.error {
+             background-color: #dc3545; /* Error red */
+         }
+
+        /* Snapshot gallery styling */
+        #snapshot-gallery {
             margin-top: 20px;
             width: 100%;
-            max-width: 680px;
+            max-width: 680px; /* Slightly wider than video */
             display: flex;
             flex-wrap: wrap;
-            gap: 15px;
+            gap: 15px; /* Space between snapshots */
             justify-content: center;
             padding: 10px;
             border-radius: 5px;
             background-color: #e9e9e9;
-         }
+        }
         .snapshot {
             border: 1px solid #ccc;
             padding: 8px;
@@ -142,7 +189,7 @@
             align-items: center;
         }
         .snapshot img {
-            max-width: 150px;
+            max-width: 150px; /* Limit snapshot preview size */
             height: auto;
             display: block;
             margin-bottom: 8px;
@@ -152,41 +199,39 @@
         .snapshot a {
             text-decoration: none;
             background-color: #007bff;
-            color: white;
+            color: #fff;
             padding: 5px 10px;
             border-radius: 3px;
             font-size: 0.85em;
             cursor: pointer;
             transition: background-color 0.2s ease;
         }
-        .snapshot a:hover {
-            background-color: #0056b3;
-        }
+        .snapshot a:hover { background-color: #0056b3; }
         #no-snapshots {
-             width: 100%;
-             text-align: center;
-             color: #666;
-             font-style: italic;
-         }
-
+            width: 100%;
+            text-align: center;
+            color: #666;
+            font-style: italic;
+        }
         /* Responsive adjustments */
         @media (max-width: 700px) {
             body { padding: 10px; }
             h1 { font-size: 1.5em; }
             h2 { font-size: 1.2em; }
             .container { width: 100%; max-width: 100%; }
-             .controls { flex-direction: column; align-items: stretch; max-width: 100%; }
-             .control-group { justify-content: space-between; width: 100%; }
-              #detection-status { width: 100%; box-sizing: border-box; margin-left: 0; margin-top: 10px; }
-             #status { max-width: 100%; font-size: 0.9em; }
-             #snapshot-gallery { max-width: 100%; gap: 10px; }
-             .snapshot img { max-width: 120px; }
+            .controls { flex-direction: column; align-items: stretch; max-width: 100%; }
+            .control-group { justify-content: space-between; width: 100%; }
+            #start-stop-btn { width: 100%; max-width: 100%; } /* Full width on mobile */
+            #detection-status { width: 100%; box-sizing: border-box; margin-left: 0; margin-top: 10px; }
+            #status { max-width: 100%; font-size: 0.9em; }
+            #snapshot-gallery { max-width: 100%; gap: 10px; }
+            .snapshot img { max-width: 120px; }
         }
     </style>
 </head>
 <body>
 
-    <h1>Webcam Object Detector (YOLO - execute())</h1> <!-- Title updated -->
+    <h1>Webcam Insect Detector (Target Classes Only)</h1>
 
     <div id="status">Initializing Application...</div>
 
@@ -197,24 +242,27 @@
 
     <div class="controls" id="main-controls">
          <div class="control-group">
-             <label for="model-select">Select Model:</label>
-             <select id="model-select">
-                 <option value="yolov8n">YOLOv8n</option>
-                 <option value="yolov11n">YOLOv11n</option>
-             </select>
+              <label for="model-select">Select Model:</label>
+              <select id="model-select" disabled>
+                  <option value="yolov8n">YOLOv8n</option>
+                  <option value="yolov11n">YOLOv11n</option> </select>
          </div>
          <div id="detection-status">Status: Idle</div>
      </div>
 
+    <button id="start-stop-btn" class="start" disabled>Start Detecting</button>
+    <div id="emailNotification">Email Sent Successfully!</div>
 
-    <h2>Detected Human Snapshots</h2>
+    <h2>Detected Target Insect Snapshots</h2>
     <div id="snapshot-gallery">
         <p id="no-snapshots">No snapshots taken yet.</p>
-        <!-- Snapshots will be added here -->
     </div>
 
     <script>
-        // --- Constants ---
+        // Initialize EmailJS (if you have a public key)
+        emailjs.init("<KEY>"); // Replace with your actual EmailJS public key
+
+        // --- DOM Element References ---
         const video = document.getElementById('video');
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
@@ -225,363 +273,441 @@
         const noSnapshotsMsg = document.getElementById('no-snapshots');
         const videoContainer = document.getElementById('video-container');
         const controlsDiv = document.getElementById('main-controls');
+        const startStopBtn = document.getElementById('start-stop-btn');
+        const emailNotificationDiv = document.getElementById('emailNotification');
 
-        // --- Model & Detection Parameters (Adjust based on your pipeline/model) ---
-        const INPUT_WIDTH = 640;  // Width model expects
-        const INPUT_HEIGHT = 640; // Height model expects
-        const SCORE_THRESHOLD = 0.3; // Min score threshold from your pipeline
-        const NMS_THRESHOLD = 0.45;  // IoU threshold for NMS (typical value)
-        const MAX_DETECTIONS = 100; // Max detections to consider after NMS
-        const SNAPSHOT_COOLDOWN_MS = 3000;
-        const HUMAN_CLASS_ID = 0; // Assuming 0 is 'person' in your model's classes
+        // --- Model & Detection Parameters ---
+        const INPUT_WIDTH = 640; // Model input width
+        const INPUT_HEIGHT = 640; // Model input height
+        const SCORE_THRESHOLD = 0.6;  // Confidence threshold (lowered)
+        const NMS_THRESHOLD = 0.5;   // Non-Maximum Suppression threshold
+        const MAX_DETECTIONS = 100;   // Max detections per frame after NMS
+
+        // --- Target Classes for Snapshot/Email ---
+        const TARGET_CLASS_IDS = new Set([4, 5, 6, 8, 9, 24, 25, 56, 92, 97]);
+
+        // --- Snapshot & Email Parameters ---
+        const SNAPSHOT_MIN_INTERVAL_MS = 1 * 60 * 1000; // 1 minute
+        const EMAIL_COOLDOWN_MS = 10 * 60 * 1000; // 10 minutes
+        const IMGBB_API_KEY = "<API KEY>"; // WARNING: Insecure
+        const EMAILJS_SERVICE_ID = "<API KEY>"; // WARNING: Insecure
+        const EMAILJS_TEMPLATE_ID = "<API KEY>"; // WARNING: Insecure
 
         // --- State Variables ---
         let currentModel = null;
         let modelName = modelSelect.value;
         let isDetecting = false;
-        let snapshotCooldown = false;
+        let isDetectionRunning = false;
         let rafId = null;
+        let lastSnapshotTime = 0;
+        let lastDetectedClassesSet = null;
+        let lastNotificationTime = 0;
 
-        // --- COCO Classes (Keep for drawing labels if needed) ---
-        const COCO_CLASSES = { /* ... Keep the COCO_CLASSES mapping here ... */
-             0: 'person', 1: 'bicycle', 2: 'car', 3: 'motorcycle', 4: 'airplane', 5: 'bus',
-             6: 'train', 7: 'truck', 8: 'boat', 9: 'traffic light', 10: 'fire hydrant',
-             11: 'stop sign', 12: 'parking meter', 13: 'bench', 14: 'bird', 15: 'cat',
-             16: 'dog', 17: 'horse', 18: 'sheep', 19: 'cow', 20: 'elephant', 21: 'bear',
-             22: 'zebra', 23: 'giraffe', 24: 'backpack', 25: 'umbrella', 26: 'handbag',
-             27: 'tie', 28: 'suitcase', 29: 'frisbee', 30: 'skis', 31: 'snowboard',
-             32: 'sports ball', 33: 'kite', 34: 'baseball bat', 35: 'baseball glove',
-             36: 'skateboard', 37: 'surfboard', 38: 'tennis racket', 39: 'bottle',
-             40: 'wine glass', 41: 'cup', 42: 'fork', 43: 'knife', 44: 'spoon', 45: 'bowl',
-             46: 'banana', 47: 'apple', 48: 'sandwich', 49: 'orange', 50: 'broccoli',
-             51: 'carrot', 52: 'hot dog', 53: 'pizza', 54: 'donut', 55: 'cake', 56: 'chair',
-             57: 'couch', 58: 'potted plant', 59: 'bed', 60: 'dining table', 61: 'toilet',
-             62: 'tv', 63: 'laptop', 64: 'mouse', 65: 'remote', 66: 'keyboard', 67: 'cell phone',
-             68: 'microwave', 69: 'oven', 70: 'toaster', 71: 'sink', 72: 'refrigerator',
-             73: 'book', 74: 'clock', 75: 'vase', 76: 'scissors', 77: 'teddy bear',
-             78: 'hair drier', 79: 'toothbrush'
-         };
+        // --- COCO Class Names ---
+        const COCO_CLASSES = {
+            1: 'bicycle', 2: 'car', 3: 'motorcycle', 4: 'asiatic rice borer', 5: 'yellow rice borer',
+            6: 'rice gall midge', 7: 'airplane', 8: 'brown plant hopper', 9: 'white backed plant hopper',
+            10: 'bus', 11: 'train', 12: 'truck', 13: 'boat', 14: 'traffic light', 15: 'fire hydrant',
+            16: 'stop sign', 17: 'parking meter', 18: 'bench', 19: 'bird', 20: 'cat', 21: 'dog',
+            22: 'horse', 23: 'sheep', 24: 'army worm', 25: 'aphids', 26: 'cow', 27: 'elephant',
+            28: 'bear', 29: 'zebra', 30: 'giraffe', 31: 'backpack', 32: 'umbrella', 33: 'handbag',
+            34: 'tie', 35: 'suitcase', 36: 'frisbee', 37: 'skis', 38: 'snowboard', 39: 'sports ball',
+            40: 'kite', 41: 'baseball bat', 42: 'baseball glove', 43: 'skateboard', 44: 'surfboard',
+            45: 'tennis racket', 46: 'bottle', 47: 'wine glass', 48: 'cup', 49: 'fork', 50: 'knife',
+            51: 'spoon', 52: 'bowl', 53: 'banana', 54: 'apple', 55: 'sandwich', 56: 'pieris canidia',
+            57: 'orange', 58: 'broccoli', 59: 'carrot', 60: 'hot dog', 61: 'pizza', 62: 'donut',
+            63: 'cake', 64: 'chair', 65: 'couch', 66: 'potted plant', 67: 'bed', 68: 'dining table',
+            69: 'toilet', 70: 'tv', 71: 'laptop', 72: 'mouse', 73: 'remote', 74: 'keyboard',
+            75: 'cell phone', 76: 'microwave', 77: 'oven', 78: 'toaster', 79: 'sink', 80: 'refrigerator',
+            81: 'book', 82: 'clock', 83: 'vase', 84: 'scissors', 85: 'teddy bear', 86: 'hair drier',
+            87: 'toothbrush', 88: '', 89: '', 90: '', 91: '', 92: 'scirtothrips dorsalis hood',
+            93: '', 94: '', 95: '', 96: '', 97: 'chlumetia transversa', 98: '', 99: '',
+        };
 
-        // --- Model Loading (Remains the same, warmup uses execute) ---
+        /** Loads a specified TensorFlow.js GraphModel. */
         async function loadModel(name) {
-             statusDiv.textContent = `Switching to ${name}...`; console.log(`Loading model: ${name}`);
-             detectionStatusDiv.textContent = 'Status: Idle'; detectionStatusDiv.className = 'detection-status';
-             isDetecting = false; if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+            // (Function content remains the same)
+            if (isDetectionRunning) { stopDetectionLoop(); }
+            statusDiv.textContent = `Switching to ${name}...`;
+            console.log(`Loading model: ${name}`);
+            detectionStatusDiv.textContent = 'Status: Idle';
+            detectionStatusDiv.className = 'detection-status';
+            isDetecting = false; lastSnapshotTime = 0; lastDetectedClassesSet = null;
+            startStopBtn.disabled = true; modelSelect.disabled = true;
 
-             if (currentModel) {
-                 console.log("Disposing prev model..."); statusDiv.textContent = `Disposing...`;
-                 await new Promise(resolve => setTimeout(resolve, 50));
-                 try { currentModel.dispose(); currentModel = null; } catch (e) { console.error(e); }
-                  ctx.clearRect(0, 0, canvas.width, canvas.height);
-             }
+            if (currentModel) {
+                console.log("Disposing previous model...");
+                statusDiv.textContent = `Disposing previous model...`;
+                await new Promise(resolve => setTimeout(resolve, 50));
+                try { currentModel.dispose(); currentModel = null; } catch (e) { console.error("Error disposing model:", e); }
+                 ctx.clearRect(0, 0, canvas.width, canvas.height);
+            }
 
-             statusDiv.textContent = `Init TFJS backend...`; await new Promise(resolve => setTimeout(resolve, 50));
-             await tf.ready();
-              try { await tf.setBackend('webgl'); await tf.ready(); console.log("Using WebGL"); }
-              catch (e) { console.warn("WebGL failed -> CPU", e); try { await tf.setBackend('cpu'); await tf.ready(); console.log("Using CPU"); } catch (cpuError) { console.error(cpuError); statusDiv.textContent = "TFJS Error."; return false; } }
+            statusDiv.textContent = `Initializing TFJS backend...`;
+            await new Promise(resolve => setTimeout(resolve, 50));
+            await tf.ready();
+            try { await tf.setBackend('webgl'); await tf.ready(); console.log("Using WebGL backend."); }
+            catch (e) {
+                console.warn("WebGL backend failed, falling back to CPU.", e);
+                try { await tf.setBackend('cpu'); await tf.ready(); console.log("Using CPU backend."); }
+                catch (cpuError) { console.error("CPU backend also failed:", cpuError); statusDiv.textContent = "TFJS Backend Error."; return false; }
+            }
 
-             const modelPath = `./${name}_web_model/model.json`;
-             console.log(`Model path: ${modelPath}`); statusDiv.textContent = `Loading ${name}...`;
+            const modelPath = `./${name}_web_model_insect/model.json`;
+            console.log(`Model path: ${modelPath}`);
+            statusDiv.textContent = `Loading ${name} model...`;
 
-             try {
-                 currentModel = await tf.loadGraphModel(modelPath); console.log(`${name} loaded.`);
-                 statusDiv.textContent = `Warming ${name}...`; await new Promise(resolve => setTimeout(resolve, 100));
+            try {
+                currentModel = await tf.loadGraphModel(modelPath);
+                console.log(`${name} model loaded successfully.`);
+                statusDiv.textContent = `Warming up ${name}...`;
+                await new Promise(resolve => setTimeout(resolve, 100));
+                console.time(`Warm-up ${name}`);
+                tf.tidy(() => {
+                    const dummyInput = tf.zeros([1, INPUT_HEIGHT, INPUT_WIDTH, 3], 'float32');
+                    const dummyOutput = currentModel.execute(dummyInput);
+                    if (Array.isArray(dummyOutput)) { dummyOutput.forEach(t => t.dispose()); } else if (dummyOutput) { dummyOutput.dispose(); }
+                });
+                console.timeEnd(`Warm-up ${name}`);
+                statusDiv.textContent = `${name} model ready. Select 'Start Detecting'.`;
+                console.log(`${name} model initialized and warmed up.`);
+                modelName = name;
+                startStopBtn.disabled = false; modelSelect.disabled = false;
+                return true;
+            } catch (error) {
+                statusDiv.textContent = `Error loading/warming ${name}. Check console.`;
+                console.error(`Failed to load model (${name} from ${modelPath}):`, error);
+                currentModel = null; startStopBtn.disabled = true; modelSelect.disabled = false;
+                return false;
+            }
+        }
 
-                 console.time(`Warm-up ${name}`);
-                 tf.tidy(() => { // Use tf.tidy for warmup tensors
-                      const dummyInput = tf.zeros([1, INPUT_HEIGHT, INPUT_WIDTH, 3], 'float32');
-                      const dummyOutput = currentModel.execute(dummyInput); // SYNC execute for warmup
-                      if (Array.isArray(dummyOutput)) dummyOutput.forEach(t => t.dispose()); else if (dummyOutput) dummyOutput.dispose();
-                 });
-                 console.timeEnd(`Warm-up ${name}`);
-
-                 statusDiv.textContent = `${name} ready.`; console.log(`${name} initialized.`); modelName = name;
-
-                 if (video.readyState >= 4) { startDetectionLoop(); }
-                 else { console.warn("Webcam not ready."); video.addEventListener('canplay', startDetectionLoop, { once: true }); }
-                 return true;
-
-             } catch (error) {
-                 statusDiv.textContent = `Error loading/warming ${name}. Check console.`;
-                 console.error(`Model Error (${name} @ ${modelPath}):`, error);
-                 currentModel = null; isDetecting = false; if (rafId) cancelAnimationFrame(rafId); rafId = null;
-                 return false;
-             }
-         }
-
-        // --- Webcam Setup (Remains the same) ---
+        /** Sets up the webcam stream. */
         async function setupWebcam() {
+            // (Function content remains the same)
              return new Promise((resolve, reject) => {
-                 if (!navigator.mediaDevices?.getUserMedia) { reject('getUserMedia unsupported.'); return; }
-                  navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' }, audio: false })
-                     .then(stream => {
-                         video.srcObject = stream;
-                         video.addEventListener('loadedmetadata', () => {
-                             canvas.width = video.videoWidth; canvas.height = video.videoHeight;
-                             videoContainer.style.height = `${video.videoHeight}px`;
-                             console.log(`Webcam started: ${video.videoWidth}x${video.videoHeight}`); resolve();
-                         }, { once: true });
-                          video.addEventListener('error', (e) => { reject(`Webcam error: ${e.message || 'Unknown'}`); });
-                     })
-                     .catch(err => { console.error("getUserMedia error:", err); reject(`Webcam Access Error: ${err.name}`); });
-             });
-         }
+                if (!navigator.mediaDevices?.getUserMedia) { reject('Browser does not support getUserMedia API.'); return; }
+                navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' }, audio: false })
+                .then(stream => {
+                    video.srcObject = stream;
+                    video.addEventListener('loadedmetadata', () => {
+                        canvas.width = video.videoWidth;
+                        canvas.height = video.videoHeight;
+                        videoContainer.style.height = `${video.videoHeight}px`;
+                        console.log(`Webcam stream started: ${video.videoWidth}x${video.videoHeight}`);
+                        resolve();
+                    }, { once: true });
+                     video.addEventListener('error', (e) => { reject(`Webcam video error: ${e.message || 'Unknown error'}`); });
+                })
+                .catch(err => {
+                    console.error("getUserMedia error:", err);
+                    let errorMsg = `Webcam Access Error: ${err.name}`;
+                    if (err.name === 'NotAllowedError') { errorMsg = 'Webcam permission denied.'; }
+                    else if (err.name === 'NotFoundError') { errorMsg = 'No webcam found.'; }
+                    reject(errorMsg);
+                });
+            });
+        }
 
-        // --- Detection Loop Control (Remains the same) ---
+        /** Initiates the object detection loop. */
         function startDetectionLoop() {
-            if (!currentModel) { console.warn("No model."); statusDiv.textContent = "Load model."; return; }
-            if (video.paused || video.ended || video.readyState < 4) { console.warn("Video not ready."); statusDiv.textContent = "Wait video..."; video.removeEventListener('canplay', startDetectionLoop); video.addEventListener('canplay', startDetectionLoop, { once: true }); return; }
-            if (isDetecting) { console.log("Already detecting."); return; }
-            console.log("Starting detection loop..."); statusDiv.textContent = `Detecting (${modelName})...`;
+            // (Function content remains the same)
+            if (!currentModel) { console.warn("Cannot start: No model loaded."); statusDiv.textContent = "Load a model first."; return; }
+            if (video.paused || video.ended || video.readyState < 4) { console.warn("Cannot start: Video stream not ready."); statusDiv.textContent = "Waiting for video stream..."; return; }
+            if (isDetectionRunning) { console.log("Detection is already running."); return; }
+            console.log("Starting detection loop via button...");
+            isDetectionRunning = true;
+            statusDiv.textContent = `Detecting objects (${modelName})...`;
             detectFrame();
         }
 
-        // --- *** PROCESSING PIPELINE (Corrected Slice Indices) *** ---
-        async function processDetections(predictionsTensor) {
-            // Input: Raw predictions tensor from model.execute
-            // Output: { boxes: Float32Array[], scores: number[], classIds: number[] }
-            //         where boxes are normalized [y1, x1, y2, x2]
+        /** Stops the object detection loop. */
+        function stopDetectionLoop() {
+            // (Function content remains the same)
+            if (!isDetectionRunning && !isDetecting && !rafId) { console.log("Detection loop already stopped."); return; }
+            console.log("Stopping detection loop...");
+            isDetectionRunning = false;
+            if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+            isDetecting = false;
+            statusDiv.textContent = "Detection stopped.";
+            updateDetectionStatus(false, false, true); // Reset status indicator to Idle
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            startStopBtn.textContent = "Start Detecting";
+            startStopBtn.className = 'start';
+            modelSelect.disabled = false;
+        }
 
-            const finalBoxes = [];
-            const finalScores = [];
-            const finalClassIds = [];
-            // Keep track of tensors to dispose manually
+        /**
+         * Processes the raw output tensor from the YOLO model.
+         * **REVISED** to normalize coordinates after conversion.
+         */
+        async function processDetections(predictionsTensor) {
+            const finalBoxes = []; const finalScores = []; const finalClassIds = [];
             let tensorsToDispose = [];
 
             try {
-                 const transposedPreds = predictionsTensor.transpose([0, 2, 1]); // [1, 8400, 84]
-                 tensorsToDispose.push(transposedPreds);
+                const transposedPreds = predictionsTensor.transpose([0, 2, 1]);
+                tensorsToDispose.push(transposedPreds);
+                const squeezedPreds = tf.squeeze(transposedPreds);
+                tensorsToDispose.push(squeezedPreds);
 
-                 // --- Corrected Slicing for [..., 84] structure ---
-                 const boxes = transposedPreds.slice([0, 0, 0], [-1, -1, 4]);     // Indices 0-3: Box [cx, cy, w, h]
-                 const classes = transposedPreds.slice([0, 0, 4], [-1, -1, 80]); // Indices 4-83: Class scores (80 classes)
-                 tensorsToDispose.push(boxes, classes);
+                // Assume boxes_cxywh contains pixel coordinates relative to INPUT_WIDTH, INPUT_HEIGHT
+                const boxes_cxywh = squeezedPreds.slice([0, 0], [-1, 4]);
+                const numClasses = squeezedPreds.shape[1] - 4;
+                const classes = squeezedPreds.slice([0, 4], [-1, numClasses]);
+                tensorsToDispose.push(boxes_cxywh, classes);
+                const maxScores = tf.max(classes, 1);
+                const classIdsTensor = tf.argMax(classes, 1);
+                tensorsToDispose.push(maxScores, classIdsTensor);
 
-                 // Squeeze to remove batch dim -> [num_boxes, features]
-                 const squeezedBoxes = tf.squeeze(boxes);    // [8400, 4]
-                 const squeezedClasses = tf.squeeze(classes); // [8400, 80]
-                 tensorsToDispose.push(squeezedBoxes, squeezedClasses);
+                const scoresArray = await maxScores.array();
+                const filteredIndices = scoresArray
+                    .map((score, index) => score > SCORE_THRESHOLD ? index : -1)
+                    .filter(index => index !== -1);
 
-                 // --- Calculate Max Score and Class ID per detection ---
-                 const maxScores = tf.max(squeezedClasses, 1);   // Max score along class axis -> [8400]
-                 const classIdsTensor = tf.argMax(squeezedClasses, 1); // Index of max score (Class ID) -> [8400]
-                 tensorsToDispose.push(maxScores, classIdsTensor);
+                if (filteredIndices.length === 0) {
+                    console.log("No detections above score threshold."); // Debug log
+                    return { boxes: [], scores: [], classIds: [] };
+                }
 
-                 // --- Pre-filtering based on Max Score Threshold ---
-                 const scoresArray = await maxScores.array(); // Get scores as JS array
-                 const filteredIndices = scoresArray
-                     .map((score, index) => score > SCORE_THRESHOLD ? index : -1)
-                     .filter(index => index !== -1);
+                const filteredIndicesTensor = tf.tensor1d(filteredIndices, 'int32');
+                tensorsToDispose.push(filteredIndicesTensor);
+                const boxes_cxywh_filtered = boxes_cxywh.gather(filteredIndicesTensor);
+                const scores_filtered = maxScores.gather(filteredIndicesTensor);
+                const classIds_filtered = classIdsTensor.gather(filteredIndicesTensor);
+                tensorsToDispose.push(boxes_cxywh_filtered, scores_filtered, classIds_filtered);
 
-                 if (filteredIndices.length === 0) {
-                     console.log("No detections above score threshold.");
-                     return { boxes: [], scores: [], classIds: [] }; // Return empty results
-                 }
+                // --- Convert boxes from [cx, cy, w, h] (pixel coords) to [y1, x1, y2, x2] (pixel coords) ---
+                const [cx, cy, w, h] = tf.unstack(boxes_cxywh_filtered, 1);
+                const x1 = tf.sub(cx, tf.div(w, 2));
+                const y1 = tf.sub(cy, tf.div(h, 2));
+                const x2 = tf.add(cx, tf.div(w, 2));
+                const y2 = tf.add(cy, tf.div(h, 2));
+                tensorsToDispose.push(cx, cy, w, h, x1, y1, x2, y2); // Keep pixel coords tensors for disposal
 
-                 const filteredIndicesTensor = tf.tensor1d(filteredIndices, 'int32');
-                 tensorsToDispose.push(filteredIndicesTensor);
+                // --- Normalize Box Coordinates [y1, x1, y2, x2] to [0, 1] range ---
+                const norm_y1 = tf.div(y1, INPUT_HEIGHT);
+                const norm_x1 = tf.div(x1, INPUT_WIDTH);
+                const norm_y2 = tf.div(y2, INPUT_HEIGHT);
+                const norm_x2 = tf.div(x2, INPUT_WIDTH);
 
-                 // --- Gather boxes, scores, and class IDs using filtered indices ---
-                 const boxes_filtered = squeezedBoxes.gather(filteredIndicesTensor);
-                 const scores_filtered = maxScores.gather(filteredIndicesTensor); // Gather the calculated max scores
-                 const classIds_filtered = classIdsTensor.gather(filteredIndicesTensor); // Gather the calculated class IDs
-                 tensorsToDispose.push(boxes_filtered, scores_filtered, classIds_filtered);
+                // Stack the *normalized* coordinates for NMS
+                const nmsBoxesNormalized = tf.stack([norm_y1, norm_x1, norm_y2, norm_x2], 1);
+                tensorsToDispose.push(norm_y1, norm_x1, norm_y2, norm_x2, nmsBoxesNormalized);
+                // --- End Normalization ---
 
-                 // --- Non-Max Suppression ---
-                 // NMS needs boxes in [y1, x1, y2, x2] format if using standard TFJS NMS.
-                 // However, your original pipeline used cx, cy, w, h directly.
-                 // Let's assume standard NMS and convert AFTER NMS for drawing if needed,
-                 // OR convert *before* NMS if your NMS implementation expects that.
-                 // Sticking to using raw boxes_filtered (cx, cy, w, h) for NMS as per your likely previous intent.
-                 // If NMS fails, you might need to convert boxes_filtered to y1,x1,y2,x2 first.
+                // Perform Non-Maximum Suppression (NMS) using the *normalized* boxes
+                const selectedIndicesTensor = await tf.image.nonMaxSuppressionAsync(
+                    nmsBoxesNormalized, // Use normalized boxes
+                    scores_filtered,
+                    MAX_DETECTIONS,
+                    NMS_THRESHOLD,
+                    SCORE_THRESHOLD
+                );
+                tensorsToDispose.push(selectedIndicesTensor);
+                const selectedIndices = await selectedIndicesTensor.array();
 
-                 const selectedIndicesTensor = await tf.image.nonMaxSuppressionAsync(
-                     boxes_filtered,      // Assuming NMS handles cx,cy,w,h or you adjusted it
-                     scores_filtered,     // Scores: shape [num_filtered]
-                     MAX_DETECTIONS,      // Max boxes to keep
-                     NMS_THRESHOLD,       // IoU Threshold
-                     SCORE_THRESHOLD      // Score Threshold (can re-apply here)
-                 );
-                 tensorsToDispose.push(selectedIndicesTensor);
-                 const selectedIndices = await selectedIndicesTensor.array(); // Get indices as JS array
+                // Get the final *normalized* boxes kept by NMS
+                const finalBoxesDataNormalized = await nmsBoxesNormalized.gather(selectedIndicesTensor).array();
+                const finalScoresData = await scores_filtered.gather(selectedIndicesTensor).array();
+                const finalClassIdsData = await classIds_filtered.gather(selectedIndicesTensor).array();
 
-                 // --- Process selected boxes ---
-                 const boxesData = await boxes_filtered.array();     // Data of FILTERED boxes [cx, cy, w, h]
-                 const scoresData = await scores_filtered.array();   // Data of FILTERED scores (max class score)
-                 const classIdsData = await classIds_filtered.array(); // Data of FILTERED class IDs
+                // Populate final results using the normalized data
+                for (let i = 0; i < selectedIndices.length; i++) {
+                    const classId = finalClassIdsData[i];
+                    const score = finalScoresData[i];
+                    const box_yxyx_norm = finalBoxesDataNormalized[i]; // Box is already [y1, x1, y2, x2] normalized
 
-                 for (const index of selectedIndices) { // Loop through the *indices* returned by NMS
-                     // `index` here refers to the position within the *filtered* tensors
-                     const classId = classIdsData[index]; // Get the final Class ID
-                     const score = scoresData[index];     // Get the final Score
+                    // Clamp coordinates to [0, 1] range (good practice)
+                    const [y1_norm, x1_norm, y2_norm, x2_norm] = box_yxyx_norm;
+                    finalBoxes.push([
+                        Math.max(0, y1_norm), Math.max(0, x1_norm),
+                        Math.min(1, y2_norm), Math.min(1, x2_norm)
+                    ]);
+                    finalScores.push(score);
+                    finalClassIds.push(classId);
+                }
 
-                     // Get box coordinates [cx, cy, w, h] for this detection
-                     const [cx, cy, w, h] = boxesData[index];
-
-                     // --- Convert to normalized [y1, x1, y2, x2] ---
-                     const norm_cx = cx / INPUT_WIDTH;
-                     const norm_cy = cy / INPUT_HEIGHT;
-                     const norm_w = w / INPUT_WIDTH;
-                     const norm_h = h / INPUT_HEIGHT;
-                     const y1 = norm_cy - norm_h / 2;
-                     const x1 = norm_cx - norm_w / 2;
-                     const y2 = norm_cy + norm_h / 2;
-                     const x2 = norm_cx + norm_w / 2;
-
-                     finalBoxes.push([ Math.max(0, y1), Math.max(0, x1), Math.min(1, y2), Math.min(1, x2) ]);
-                     finalScores.push(score);
-                     finalClassIds.push(classId);
-                 }
-
+                console.log("Final Detections:", { boxes: finalBoxes, scores: finalScores, classIds: finalClassIds }); // Debug log (still active)
                 return { boxes: finalBoxes, scores: finalScores, classIds: finalClassIds };
 
             } catch(error) {
-                console.error("Error in processDetections:", error);
-                return { boxes: [], scores: [], classIds: [] }; // Return empty on error
+                console.error("Error during detection processing:", error);
+                return { boxes: [], scores: [], classIds: [] };
             } finally {
-                // Dispose intermediate tensors created *within this function*
                 tf.dispose(tensorsToDispose);
-                // DO NOT dispose predictionsTensor here, it's disposed in detectFrame
             }
         }
 
 
-        // --- Main Detection Frame Logic (Using model.execute()) ---
-        async function detectFrame() { // Still async due to other awaits (like processDetections data())
-             if (!currentModel || video.paused || video.ended || video.readyState < 3) {
-                 console.log("Stopping detection loop."); isDetecting = false; if (rafId) cancelAnimationFrame(rafId); rafId = null;
-                 statusDiv.textContent = currentModel ? "Webcam stopped." : "Model unloaded."; updateDetectionStatus(null, null, true); return;
-             }
-             if (isDetecting) return;
+        /** Helper function to compare two Sets for equality. */
+        function areSetsEqual(setA, setB) {
+            // (Function content remains the same)
+            if (!setA || !setB) return false;
+            if (setA.size !== setB.size) return false;
+            for (const item of setA) { if (!setB.has(item)) return false; }
+            return true;
+        }
 
-             isDetecting = true; rafId = null;
-             let inputTensor;
-             let predictions; // Raw model output tensor(s)
+        /** Performs object detection on a single video frame. */
+        async function detectFrame() {
+            // (Function content remains the same)
+             if (!isDetectionRunning || !currentModel || video.paused || video.ended || video.readyState < 3) {
+                console.log("Stopping detection frame processing (loop stopped, no model, or video issue).");
+                stopDetectionLoop(); return;
+            }
+            if (isDetecting) { rafId = requestAnimationFrame(detectFrame); return; }
+            isDetecting = true; rafId = null;
+            let predictions;
 
-             try {
-                 // --- Preprocessing and SYNC Inference ---
-                 [inputTensor, predictions] = tf.tidy(() => { // Wrap preprocessing and sync execution in tidy
-                      const tempInput = tf.tidy(() => { // Inner tidy for just preprocessing tensors
-                           const imgTensor = tf.browser.fromPixels(video);
-                           const resizedTensor = tf.image.resizeBilinear(imgTensor.toFloat(), [INPUT_HEIGHT, INPUT_WIDTH]);
-                           const normalizedTensor = resizedTensor.div(255.0);
-                           return normalizedTensor.expandDims(0);
-                      });
+            try {
+                [/* inputTensor disposed by tidy */, predictions] = tf.tidy(() => {
+                    const imgTensor = tf.browser.fromPixels(video);
+                    const resizedTensor = tf.image.resizeBilinear(imgTensor.toFloat(), [INPUT_HEIGHT, INPUT_WIDTH]);
+                    const normalizedTensor = resizedTensor.div(255.0);
+                    const batchedInput = normalizedTensor.expandDims(0);
+                    return [null, currentModel.execute(batchedInput)];
+                });
 
-                      // *** Use synchronous model.execute() ***
-                      // Note: This WILL block the main thread during inference.
-                      const tempPredictions = currentModel.execute(tempInput);
+                const rawOutputTensor = Array.isArray(predictions) ? predictions[0] : predictions;
+                if (!rawOutputTensor) { console.warn("Model execution returned null output."); return; }
 
-                      // Return both tensors from the outer tidy to keep them
-                      return [tempInput, tempPredictions];
-                 });
-                 // inputTensor is kept by tidy's return, dispose it manually after use (or lack thereof)
-                 // predictions are kept by tidy's return
+                const { boxes: finalBoxes, scores: finalScores, classIds: finalClassIds } = await processDetections(rawOutputTensor);
 
+                // Data passed to drawBoundingBoxes log is still active
+                console.log("Data passed to drawBoundingBoxes:", { finalBoxes, finalScores, finalClassIds });
 
-                 // Assuming the model returns a single tensor matching processDetections input
-                 const rawOutputTensor = Array.isArray(predictions) ? predictions[0] : predictions;
+                drawBoundingBoxes(finalBoxes, finalScores, finalClassIds);
 
-                 if (!rawOutputTensor) {
-                      console.warn("Model execution returned null or undefined output.");
-                      // Predictions are already kept outside tidy, dispose here if needed
-                      if(Array.isArray(predictions)) predictions.forEach(t => t?.dispose());
-                      else predictions?.dispose();
-                      if(inputTensor && !inputTensor.isDisposed) inputTensor.dispose(); // Dispose input if not used
-                      return; // Go to finally block
+                // --- Status Update & Snapshot Trigger Logic ---
+                const detectedObjects = finalBoxes.length > 0;
+                const currentTime = Date.now();
+                const currentClassesSet = new Set(finalClassIds);
+                const targetDetected = finalClassIds.some(id => TARGET_CLASS_IDS.has(id));
+
+                updateDetectionStatus(targetDetected, !detectedObjects);
+
+                if (targetDetected) {
+                    const timeElapsedSinceLastSnapshot = currentTime - lastSnapshotTime;
+                    const classesChangedSinceLastSnapshot = !areSetsEqual(currentClassesSet, lastDetectedClassesSet);
+                    if (timeElapsedSinceLastSnapshot >= SNAPSHOT_MIN_INTERVAL_MS) {
+                        if (classesChangedSinceLastSnapshot || lastDetectedClassesSet === null) {
+                            const detectedTargetClasses = finalClassIds
+                                .filter(id => TARGET_CLASS_IDS.has(id))
+                                .map(id => COCO_CLASSES[id] || `ID ${id}`);
+                            const reason = `Target insect(s) detected: ${detectedTargetClasses.join(', ')}`;
+                            console.log(`Triggering snapshot. Reason: ${lastDetectedClassesSet === null ? 'Initial detection' : 'Classes changed'} & time threshold met. Detected: ${detectedTargetClasses.join(', ')}`);
+                            takeSnapshot(finalBoxes, reason);
+                            lastSnapshotTime = currentTime;
+                            lastDetectedClassesSet = currentClassesSet;
+                        }
+                    }
+                }
+
+            } catch (error) {
+                console.error("Error during detection frame:", error);
+                statusDiv.textContent = "Detection Error. Stopping.";
+                stopDetectionLoop();
+            } finally {
+                 if (predictions) {
+                     if (Array.isArray(predictions)) { predictions.forEach(t => t?.dispose()); }
+                     else { predictions?.dispose(); }
                  }
-
-                  // Dispose input tensor now that inference is done
-                  if(inputTensor && !inputTensor.isDisposed) {
-                      inputTensor.dispose();
-                      inputTensor = null;
-                  }
-
-                 // --- *** Call Your Processing Pipeline *** ---
-                 // processDetections needs async because it uses .array()/.data() internally
-                 const { boxes: finalBoxes, scores: finalScores, classIds: finalClassIds } = await processDetections(rawOutputTensor);
-                 // processDetections disposes its *internal* tensors.
-
-                 // --- Log detected objects ---
-                 if (finalClassIds.length > 0) {
-                     const detections = finalClassIds.map((id, i) => ({ class: COCO_CLASSES[id] || `ID ${id}`, score: (finalScores[i] * 100).toFixed(1) + '%' }));
-                     console.log("Detected:", detections);
-                 }
-
-                 // --- Draw Boxes ---
-                 drawBoundingBoxes(finalBoxes, finalScores, finalClassIds);
-
-                 // --- Status Update & Snapshot ---
-                 const detectedObjects = finalBoxes.length > 0;
-                 const humanDetected = finalClassIds.includes(HUMAN_CLASS_ID);
-                 updateDetectionStatus(humanDetected, !detectedObjects);
-
-                 if (humanDetected && !snapshotCooldown) {
-                     takeSnapshot(finalBoxes); snapshotCooldown = true;
-                     setTimeout(() => { snapshotCooldown = false; }, SNAPSHOT_COOLDOWN_MS);
-                 }
-
-             } catch (error) {
-                 console.error("Error during detection frame:", error); statusDiv.textContent = "Detection Error.";
-                 // Clean up input tensor if error occurred before disposal
-                  if(inputTensor && !inputTensor.isDisposed) {
-                     inputTensor.dispose();
-                     inputTensor = null;
-                  }
-             } finally {
-                  // Dispose the raw predictions tensor(s) that were kept by the main tidy block
-                  if (predictions) {
-                      if (Array.isArray(predictions)) predictions.forEach(t => t?.dispose());
-                      else predictions?.dispose();
-                  }
-                 // --- Schedule next frame ---
                  isDetecting = false;
-                 if (currentModel && !video.paused && !video.ended) { rafId = requestAnimationFrame(detectFrame); }
-             }
-         }
+                 if (isDetectionRunning && currentModel && !video.paused && !video.ended) {
+                     rafId = requestAnimationFrame(detectFrame);
+                 } else if (isDetectionRunning) {
+                     console.log("Video stopped/paused/ended unexpectedly. Stopping loop.");
+                     stopDetectionLoop();
+                 }
+            }
+        }
 
-        // --- Drawing (Uses normalized [y1, x1, y2, x2]) (Remains the same) ---
+
+        /** Draws bounding boxes and labels on the canvas overlay. */
         function drawBoundingBoxes(boxes, scores, classIds) {
-             ctx.clearRect(0, 0, canvas.width, canvas.height);
-             if (!boxes || boxes.length === 0) return;
-             const colors = ['#00FF00', '#FF0000', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF'];
-             ctx.lineWidth = 2; ctx.font = '14px Arial';
+            // (Function content remains the same, debug logs still active)
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (!boxes || boxes.length === 0) {
+                console.log("drawBoundingBoxes called with no boxes."); // Debug log
+                return;
+            }
+            const colors = ['#00FF00', '#FF0000', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF', '#FFA500', '#800080'];
+            ctx.lineWidth = 2; ctx.font = '14px Arial';
 
-             boxes.forEach((box, i) => {
-                 const classId = classIds[i];
-                 const className = COCO_CLASSES[classId] || `ID ${classId}`;
-                 const color = colors[classId % colors.length];
-                 ctx.strokeStyle = color; ctx.fillStyle = color;
+            boxes.forEach((box, i) => {
+                const classId = classIds[i];
+                const className = COCO_CLASSES[classId] || `ID ${classId}`;
+                const color = colors[classId % colors.length];
+                ctx.strokeStyle = color; ctx.fillStyle = color;
+                // Expecting normalized coords here now
+                const [y1Norm, x1Norm, y2Norm, x2Norm] = box;
 
-                 const [y1Norm, x1Norm, y2Norm, x2Norm] = box; // Already normalized
-                 const x = x1Norm * canvas.width;
-                 const y = y1Norm * canvas.height;
-                 const width = (x2Norm - x1Norm) * canvas.width;
-                 const height = (y2Norm - y1Norm) * canvas.height;
-                 const validWidth = Math.max(0, width); const validHeight = Math.max(0, height);
+                // Debug log for individual box coordinates (still active)
+                console.log(`Box ${i}: ID=${classId}, Score=${scores[i].toFixed(2)}, CoordsNorm=[${y1Norm.toFixed(2)}, ${x1Norm.toFixed(2)}, ${y2Norm.toFixed(2)}, ${x2Norm.toFixed(2)}]`);
 
-                 ctx.strokeRect(x, y, validWidth, validHeight);
-                 const scoreText = `${className}: ${(scores[i] * 100).toFixed(1)}%`;
-                 const textWidth = ctx.measureText(scoreText).width;
-                 const textHeight = parseInt(ctx.font, 10);
-                 ctx.fillRect(x, y - (textHeight + 4), textWidth + 4, textHeight + 4);
-                 ctx.fillStyle = '#000000'; ctx.fillText(scoreText, x + 2, y - 4);
-             });
-         }
+                const x = x1Norm * canvas.width;
+                const y = y1Norm * canvas.height;
+                const width = (x2Norm - x1Norm) * canvas.width;
+                const height = (y2Norm - y1Norm) * canvas.height;
 
-        // --- UI Status Update (Remains the same) ---
-        function updateDetectionStatus(isHumanDetected, noObjectsDetected, reset = false) {
-             if (reset) { detectionStatusDiv.textContent = 'Status: Idle'; detectionStatusDiv.className = 'detection-status'; return; }
-             if (isHumanDetected) { detectionStatusDiv.textContent = 'Status: Human Detected!'; detectionStatusDiv.className = 'detection-status human-detected'; }
-             else if (!noObjectsDetected) { detectionStatusDiv.textContent = 'Status: Objects Detected (No Human)'; detectionStatusDiv.className = 'detection-status objects-detected'; }
-             else { detectionStatusDiv.textContent = 'Status: No Objects'; detectionStatusDiv.className = 'detection-status no-objects'; }
-          }
+                // Debug log for calculated canvas coordinates (still active)
+                console.log(`  -> Canvas Coords: x=${x.toFixed(1)}, y=${y.toFixed(1)}, w=${width.toFixed(1)}, h=${height.toFixed(1)}`);
 
-        // --- Snapshot Logic (Remains the same) ---
-        function takeSnapshot(boxesToDraw) {
-             // ... (snapshot code remains identical to previous version) ...
-            console.log("Taking HUMAN detection snapshot...");
+                const validWidth = Math.max(0, width);
+                const validHeight = Math.max(0, height);
+
+                if (validWidth > 0 && validHeight > 0) {
+                    ctx.strokeRect(x, y, validWidth, validHeight);
+                    const scoreText = `${className}: ${(scores[i] * 100).toFixed(1)}%`;
+                    const textWidth = ctx.measureText(scoreText).width;
+                    const textHeight = parseInt(ctx.font, 10);
+                    ctx.fillRect(x, y - (textHeight + 4), textWidth + 4, textHeight + 4);
+                    ctx.fillStyle = '#000000';
+                    ctx.fillText(scoreText, x + 2, y - 4);
+                } else {
+                    // console.warn(`Skipping drawing box ${i} due to zero/negative dimensions: w=${width}, h=${height}`);
+                }
+            });
+        }
+
+        /** Updates the detection status indicator element's text and style. */
+        function updateDetectionStatus(isTargetDetected, noObjectsDetected, reset = false) {
+            // (Function content remains the same)
+            if (reset) {
+                detectionStatusDiv.textContent = 'Status: Idle';
+                detectionStatusDiv.className = 'detection-status';
+                return;
+            }
+            if (isTargetDetected) {
+                detectionStatusDiv.textContent = 'Status: Target Insect Detected!';
+                detectionStatusDiv.className = 'detection-status target-detected';
+            }
+            else if (!noObjectsDetected) {
+                 detectionStatusDiv.textContent = 'Status: Non-Target Object Detected';
+                 detectionStatusDiv.className = 'detection-status non-target-detected';
+            }
+            else {
+                detectionStatusDiv.textContent = 'Status: No Objects Detected';
+                detectionStatusDiv.className = 'detection-status no-objects';
+            }
+        }
+
+        /** Displays a temporary notification message (e.g., for email status). */
+        function showNotification(message, isError = false) {
+            // (Function content remains the same)
+             emailNotificationDiv.textContent = message;
+            emailNotificationDiv.className = isError ? 'error' : '';
+            emailNotificationDiv.style.display = 'block';
+            setTimeout(() => { emailNotificationDiv.style.display = 'none'; }, 3000);
+        }
+
+        /** Takes snapshot, uploads, sends email. */
+        async function takeSnapshot(boxesToDraw, reason = "Target insect detected") {
+            // (Function content remains the same)
+            console.log(`Processing snapshot. Reason: ${reason}`);
             if (noSnapshotsMsg) noSnapshotsMsg.style.display = 'none';
+
             const tempCanvas = document.createElement('canvas');
             tempCanvas.width = video.videoWidth; tempCanvas.height = video.videoHeight;
             const tempCtx = tempCanvas.getContext('2d');
@@ -590,33 +716,131 @@
             if (boxesToDraw?.length > 0) {
                 tempCtx.strokeStyle = '#FF0000'; tempCtx.lineWidth = 2;
                 boxesToDraw.forEach(box => {
+                    // Expecting normalized coords here now
                     const [y1Norm, x1Norm, y2Norm, x2Norm] = box;
-                    const x = x1Norm * tempCanvas.width, y = y1Norm * tempCanvas.height;
-                    const width = (x2Norm - x1Norm) * tempCanvas.width;
-                    const height = (y2Norm - y1Norm) * tempCanvas.height;
+                    const x = x1Norm * tempCanvas.width; const y = y1Norm * tempCanvas.height;
+                    const width = (x2Norm - x1Norm) * tempCanvas.width; const height = (y2Norm - y1Norm) * tempCanvas.height;
                     tempCtx.strokeRect(x, y, Math.max(0, width), Math.max(0, height));
                 });
             }
 
             const imageDataUrl = tempCanvas.toDataURL('image/jpeg', 0.9);
-            const snapshotDiv = document.createElement('div'); snapshotDiv.classList.add('snapshot');
-            const img = document.createElement('img'); img.src = imageDataUrl; img.alt = "Human detection snapshot";
-            const downloadLink = document.createElement('a'); downloadLink.href = imageDataUrl;
+            const snapshotDiv = document.createElement('div');
+            snapshotDiv.classList.add('snapshot');
+            const img = document.createElement('img');
+            img.src = imageDataUrl; img.alt = "Detection snapshot";
+            const downloadLink = document.createElement('a');
+            downloadLink.href = imageDataUrl;
             const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-            downloadLink.download = `human_snapshot_${timestamp}.jpg`; downloadLink.textContent = 'Save';
+            downloadLink.download = `snapshot_${timestamp}.jpg`;
+            downloadLink.textContent = 'Save';
             snapshotDiv.appendChild(img); snapshotDiv.appendChild(downloadLink);
             snapshotGallery.insertBefore(snapshotDiv, snapshotGallery.firstChild);
 
-            const maxSnapshots = 20; const snapshotNodes = snapshotGallery.querySelectorAll('.snapshot');
+            const maxSnapshots = 20;
+            const snapshotNodes = snapshotGallery.querySelectorAll('.snapshot');
              while (snapshotNodes.length > maxSnapshots && snapshotGallery.lastChild?.classList.contains('snapshot')) {
                  snapshotGallery.removeChild(snapshotGallery.lastChild);
              }
-         }
 
-        // --- Event Listeners (Remain the same) ---
-        modelSelect.addEventListener('change', async (event) => { const newModelName = event.target.value; if (newModelName !== modelName) { console.log(`Switching to ${newModelName}`); modelSelect.disabled = true; await loadModel(newModelName); modelSelect.disabled = false; } });
-        window.addEventListener('load', async () => { statusDiv.textContent = "Initializing..."; modelSelect.disabled = true; detectionStatusDiv.className = 'detection-status'; try { statusDiv.textContent = "Setting up Webcam..."; await setupWebcam(); statusDiv.textContent = "Loading initial model..."; const loaded = await loadModel(modelName); if (!loaded) { const msg = `Failed initial model load: ${modelName}.`; statusDiv.textContent = msg; alert(msg); } } catch (error) { statusDiv.textContent = `Init Error: ${error}`; console.error("Init failed:", error); alert(`Error initializing: ${error}`); } finally { modelSelect.disabled = false; } });
-        document.addEventListener('visibilitychange', () => { if (!currentModel || !video.srcObject) return; if (document.hidden) { console.log("Pausing detection."); if (rafId) cancelAnimationFrame(rafId); rafId = null; isDetecting = false; video.pause(); statusDiv.textContent = "Paused."; updateDetectionStatus(null, null, true); } else { console.log("Resuming detection."); video.play().catch(e => console.error(e)); startDetectionLoop(); } });
+            // --- Email Sending Logic (with Cooldown) ---
+            const currentTime = Date.now();
+            if (currentTime - lastNotificationTime < EMAIL_COOLDOWN_MS) {
+                const remainingCooldown = ((EMAIL_COOLDOWN_MS - (currentTime - lastNotificationTime))/1000).toFixed(1);
+                console.log(`Email skipped: Cooldown active. (${remainingCooldown}s remaining)`);
+                return;
+            }
+
+            console.log("Attempting to upload snapshot and send email...");
+            try {
+                const imageBlob = await new Promise(resolve => { tempCanvas.toBlob(resolve, 'image/jpeg', 0.7); });
+                if (!imageBlob) throw new Error("Failed to create image blob.");
+                const formData = new FormData();
+                formData.append('image', imageBlob);
+
+                console.log("Uploading to ImgBB...");
+                const imgbbResponse = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, { method: 'POST', body: formData });
+                const imgbbData = await imgbbResponse.json();
+
+                if (imgbbData.success && imgbbData.data.url) {
+                    const imageUrl = imgbbData.data.url;
+                    console.log('Image uploaded successfully:', imageUrl);
+                    console.log("Sending email via EmailJS...");
+                    await emailjs.send( EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+                            to_email: "antareep2018@gmail.com", // ** HARDCODED RECIPIENT **
+                            message: `${reason}. Snapshot captured at ${new Date().toLocaleString()}. View image: ${imageUrl}`,
+                            image_url: imageUrl
+                    });
+                    console.log('Email sent successfully via EmailJS.');
+                    showNotification('Email sent with snapshot!');
+                    lastNotificationTime = currentTime;
+                } else {
+                    throw new Error(`ImgBB upload failed: ${imgbbData.error?.message || 'Unknown error'}`);
+                }
+            } catch (error) {
+                console.error('Failed to upload image or send email:', error);
+                showNotification(`Error: ${error.message || 'Failed to send snapshot email.'}`, true);
+            }
+        }
+
+
+        // --- Event Listeners Setup ---
+        modelSelect.addEventListener('change', async (event) => {
+            // (Function content remains the same)
+             const newModelName = event.target.value;
+            if (newModelName !== modelName) {
+                console.log(`User selected model: ${newModelName}`);
+                await loadModel(newModelName);
+            }
+        });
+
+        startStopBtn.addEventListener('click', () => {
+            // (Function content remains the same)
+            if (isDetectionRunning) {
+                stopDetectionLoop();
+            } else {
+                startDetectionLoop();
+                if (isDetectionRunning) {
+                    startStopBtn.textContent = "Stop Detecting";
+                    startStopBtn.className = 'stop';
+                    modelSelect.disabled = false;
+                }
+            }
+        });
+
+        window.addEventListener('load', async () => {
+            // (Function content remains the same)
+            statusDiv.textContent = "Initializing application...";
+            try {
+                statusDiv.textContent = "Requesting Webcam Access...";
+                await setupWebcam();
+                statusDiv.textContent = "Webcam ready. Loading initial model...";
+                const initialModelName = modelSelect.value;
+                const loaded = await loadModel(initialModelName);
+                if (!loaded) {
+                    const errorMsg = `Failed to load initial model: ${initialModelName}. Try selecting another model.`;
+                    statusDiv.textContent = errorMsg;
+                    startStopBtn.disabled = true; modelSelect.disabled = false; alert(errorMsg);
+                } else {
+                     statusDiv.textContent = "Ready. Press 'Start Detecting'.";
+                }
+            } catch (error) {
+                const errorMsg = `Initialization Error: ${error}`;
+                statusDiv.textContent = errorMsg; console.error("Initialization failed:", error); alert(`Error initializing: ${error}`);
+                startStopBtn.disabled = true; modelSelect.disabled = true;
+            }
+        });
+
+        document.addEventListener('visibilitychange', () => {
+            // (Function content remains the same)
+            if (!currentModel || !video.srcObject) return;
+            if (document.hidden) {
+                if (isDetectionRunning) { console.log("Page hidden. Stopping detection."); stopDetectionLoop(); }
+            } else {
+                console.log("Page visible.");
+                if (!isDetectionRunning && currentModel) { statusDiv.textContent = "Ready. Press 'Start Detecting'."; }
+            }
+        });
 
     </script>
 
