@@ -1,6 +1,8 @@
 alpha.html
 alpha_alpha.html
 alpha2.html
+alpha*.html
+beta_style.css
 train_latest.json
 simpleyolo.html
 *.txt
