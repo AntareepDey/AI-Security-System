@@ -1,36 +1,48 @@
-/* Modern UI CSS for Webcam Insect Detector */
+/* Modern UI CSS for Webcam Insect Detector - Enhanced Version */
 :root {
-    /* Light Mode Colors */
-    --primary-light: #4285F4;
-    --primary-gradient-light: linear-gradient(135deg, #4285F4, #34A853);
+    /* Light Mode Colors - Updated with more vibrant gradients */
+    --primary-light: #3575E8;
+    --primary-gradient-light: linear-gradient(135deg, #4D8CF7, #5C8CFF);
+    --button-gradient-light: linear-gradient(135deg, #4285F4, #6C63FF);
     --secondary-light: #34A853;
+    --secondary-gradient-light: linear-gradient(135deg, #34A853, #18CDA9);
     --accent-light: #FBBC05;
     --error-light: #EA4335;
+    --error-gradient-light: linear-gradient(135deg, #EA4335, #FF5252);
     --surface-light: #FFFFFF;
     --background-light: #F8F9FA;
+    --background-gradient-light: linear-gradient(135deg, #F8F9FA, #E8EAED);
     --on-surface-light: #202124;
     --on-background-light: #3C4043;
     --border-light: #DADCE0;
     --shadow-light: rgba(60, 64, 67, 0.15);
     
-    /* Dark Mode Colors */
-    --primary-dark: #8AB4F8;
-    --primary-gradient-dark: linear-gradient(135deg, #8AB4F8, #81C995);
-    --secondary-dark: #81C995;
+    /* Dark Mode Colors - More sophisticated with better contrast */
+    --primary-dark: #5B9BFF;
+    --primary-gradient-dark: linear-gradient(135deg, #5B9BFF, #6F75FF);
+    --button-gradient-dark: linear-gradient(135deg, #6F75FF, #8A7AFF);
+    --secondary-dark: #56C596;
+    --secondary-gradient-dark: linear-gradient(135deg, #56C596, #39DCA8);
     --accent-dark: #FDD663;
     --error-dark: #F28B82;
+    --error-gradient-dark: linear-gradient(135deg, #F28B82, #FF7676);
     --surface-dark: #2D2D2D;
-    --background-dark: #1E1E1E;
+    --background-dark: #1A1D21;
+    --background-gradient-dark: linear-gradient(135deg, #1A1D21, #25282E);
     --on-surface-dark: #E8EAED;
     --on-background-dark: #DADCE0;
-    --border-dark: #5F6368;
-    --shadow-dark: rgba(0, 0, 0, 0.3);
+    --border-dark: #444A52;
+    --shadow-dark: rgba(60, 64, 67, 0.3);
     
-    /* Status Colors */
+    /* Status Colors - For the new status indicator */
     --idle-color: #757575;
+    --idle-glow: rgba(117, 117, 117, 0.4);
     --target-detected: #EA4335;
+    --target-glow: rgba(234, 67, 53, 0.6);
     --non-target-detected: #4285F4;
+    --non-target-glow: rgba(66, 133, 244, 0.5);
     --no-objects: #FBBC05;
+    --no-objects-glow: rgba(251, 188, 5, 0.5);
     
     /* Shared Variables */
     --border-radius: 16px;
@@ -48,7 +60,7 @@
 
 body {
     font-family: 'Roboto', sans-serif;
-    transition: background-color var(--transition-speed) ease, color var(--transition-speed) ease;
+    transition: background 0.5s ease, color 0.3s ease;
     min-height: 100vh;
     display: flex;
     flex-direction: column;
@@ -58,13 +70,13 @@ body {
 
 /* Light Mode */
 body.light-mode {
-    background-color: var(--background-light);
+    background: var(--background-gradient-light);
     color: var(--on-background-light);
 }
 
 /* Dark Mode */
 body.dark-mode {
-    background-color: var(--background-dark);
+    background: var(--background-gradient-dark);
     color: var(--on-background-dark);
 }
 
@@ -108,7 +120,7 @@ h4 {
     color: var(--primary-dark);
 }
 
-/* Glass Effect */
+/* Glass Effect - Enhanced with subtle pattern */
 .glass-effect {
     background: rgba(255, 255, 255, 0.7);
     backdrop-filter: blur(12px);
@@ -116,12 +128,32 @@ h4 {
     border: 1px solid rgba(255, 255, 255, 0.18);
     box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
     transition: all var(--transition-speed) ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.glass-effect::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: radial-gradient(circle at top right, rgba(255, 255, 255, 0.12), transparent 70%);
+    z-index: -1;
+    opacity: 0.6;
+    pointer-events: none;
 }
 
 .dark-mode .glass-effect {
     background: rgba(45, 45, 45, 0.7);
     border: 1px solid rgba(80, 80, 80, 0.18);
     box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+}
+
+.dark-mode .glass-effect::before {
+    background: radial-gradient(circle at top right, rgba(100, 100, 120, 0.2), transparent 70%);
+    opacity: 0.4;
 }
 
 /* Navigation Bar */
@@ -150,7 +182,7 @@ h4 {
 
 .nav-title {
     font-size: 1.25rem;
-    font-weight: 500;
+    font-weight: bold;
     color: var(--on-surface-light);
     background: var(--primary-gradient-light);
     -webkit-background-clip: text;
@@ -343,7 +375,7 @@ input:checked + .slider:before {
     padding: var(--card-padding);
     border-radius: var(--border-radius);
     flex: 1;
-    overflow: clip;
+    overflow: hidden;
 }
 
 #status-logs {
@@ -438,8 +470,9 @@ input:checked + .slider:before {
     gap: 16px;
 }
 
-/* Model Select */
+/* Model Select - Enhanced Styling */
 .model-select-wrapper {
+    position: relative;
     display: flex;
     align-items: center;
     gap: 8px;
@@ -455,69 +488,166 @@ input:checked + .slider:before {
     color: var(--on-surface-dark);
 }
 
+.model-select-wrapper::after {
+    content: '▼';
+    font-size: 10px;
+    color: var(--primary-light);
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+    transition: color 0.2s ease;
+}
+
+.dark-mode .model-select-wrapper::after {
+    color: var(--primary-dark);
+}
+
 #model-select {
-    padding: 10px 14px;
+    appearance: none;
+    padding: 10px 32px 10px 16px;
     border-radius: var(--border-radius-sm);
-    border: 1px solid var(--border-light);
+    border: 2px solid transparent;
     background-color: var(--surface-light);
+    background-image: linear-gradient(to bottom, rgba(255,255,255,0.1), rgba(0,0,0,0.05));
     color: var(--on-surface-light);
     font-family: 'Roboto', sans-serif;
     font-size: 0.9rem;
     transition: all var(--transition-speed);
     cursor: pointer;
     outline: none;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
 }
 
 .dark-mode #model-select {
-    border-color: var(--border-dark);
+    border-color: transparent;
     background-color: var(--surface-dark);
+    background-image: linear-gradient(to bottom, rgba(255,255,255,0.05), rgba(0,0,0,0.1));
     color: var(--on-surface-dark);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
 }
 
 #model-select:hover:not(:disabled) {
     border-color: var(--primary-light);
-    box-shadow: 0 0 0 2px rgba(66, 133, 244, 0.2);
+    box-shadow: 0 3px 8px rgba(66, 133, 244, 0.2);
 }
 
 .dark-mode #model-select:hover:not(:disabled) {
     border-color: var(--primary-dark);
-    box-shadow: 0 0 0 2px rgba(138, 180, 248, 0.2);
+    box-shadow: 0 3px 8px rgba(91, 155, 255, 0.2);
+}
+
+#model-select:focus {
+    border-color: var(--primary-light);
+    box-shadow: 0 0 0 3px rgba(66, 133, 244, 0.3);
+}
+
+.dark-mode #model-select:focus {
+    border-color: var(--primary-dark);
+    box-shadow: 0 0 0 3px rgba(91, 155, 255, 0.3);
 }
 
 #model-select:disabled {
     opacity: 0.6;
     cursor: not-allowed;
+    box-shadow: none;
 }
 
-/* Detection Status */
+/* Improved select dropdown styling (works in most modern browsers) */
+#model-select option {
+    background-color: var(--surface-light);
+    color: var(--on-surface-light);
+    padding: 12px;
+    font-size: 0.9rem;
+}
+
+.dark-mode #model-select option {
+    background-color: var(--surface-dark);
+    color: var(--on-surface-dark);
+}
+
+/* Detection Status - Redesigned with glowing dot */
 #detection-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     padding: 10px 16px;
     border-radius: var(--border-radius-sm);
-    background-color: var(--idle-color);
-    color: white;
+    background-color: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    color: var(--on-surface-light);
     font-weight: 500;
     font-size: 0.9rem;
-    transition: background-color var(--transition-speed);
+    transition: all var(--transition-speed);
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
 }
 
-#detection-status.target-detected {
+.dark-mode #detection-status {
+    background-color: rgba(0, 0, 0, 0.15);
+    color: var(--on-surface-dark);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.status-indicator {
+    position: relative;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background-color: var(--idle-color);
+    transition: background-color 0.3s ease;
+}
+
+.status-indicator::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background-color: var(--idle-glow);
+    transform: translate(-50%, -50%);
+    z-index: -1;
+    animation: glow 2s infinite alternate;
+}
+
+@keyframes glow {
+    0% { width: 100%; height: 100%; opacity: 0.7; }
+    100% { width: 200%; height: 200%; opacity: 0.3; }
+}
+
+#detection-status.target-detected .status-indicator {
     background-color: var(--target-detected);
-    animation: pulse 2s infinite;
 }
 
-#detection-status.non-target-detected {
+#detection-status.target-detected .status-indicator::before {
+    background-color: var(--target-glow);
+    animation: targetGlow 1s infinite alternate;
+}
+
+@keyframes targetGlow {
+    0% { width: 100%; height: 100%; opacity: 0.8; }
+    100% { width: 250%; height: 250%; opacity: 0.4; }
+}
+
+#detection-status.non-target-detected .status-indicator {
     background-color: var(--non-target-detected);
 }
 
-#detection-status.no-objects {
-    background-color: var(--no-objects);
-    color: black;
+#detection-status.non-target-detected .status-indicator::before {
+    background-color: var(--non-target-glow);
 }
 
-@keyframes pulse {
-    0% { opacity: 1; transform: scale(1); }
-    50% { opacity: 0.8; transform: scale(1.02); }
-    100% { opacity: 1; transform: scale(1); }
+#detection-status.no-objects .status-indicator {
+    background-color: var(--no-objects);
+}
+
+#detection-status.no-objects .status-indicator::before {
+    background-color: var(--no-objects-glow);
 }
 
 /* Buttons */
@@ -581,63 +711,65 @@ button:disabled {
 
 /* Start/Stop Button */
 #start-stop-btn {
-    background: var(--primary-gradient-light);
+    background: var(--button-gradient-light);
     color: white;
+    border-radius: 30px;
 }
 
 .dark-mode #start-stop-btn {
-    background: var(--primary-gradient-dark);
-    color: var(--background-dark);
+    background: var(--button-gradient-dark);
+    color: white;
 }
 
 #start-stop-btn:hover:not(:disabled) {
     transform: translateY(-2px);
     box-shadow: 0 6px 12px rgba(52, 168, 83, 0.2);
+    filter: brightness(1.05);
 }
 
 .dark-mode #start-stop-btn:hover:not(:disabled) {
     box-shadow: 0 6px 12px rgba(129, 201, 149, 0.2);
+    filter: brightness(1.05);
 }
 
 #start-stop-btn.stop {
-    background: var(--error-light);
+    background: var(--error-gradient-light);
 }
 
 .dark-mode #start-stop-btn.stop {
-    background: var(--error-dark);
-    color: var(--background-dark);
+    background: var(--error-gradient-dark);
+    color: white;
 }
 
 #start-stop-btn.stop:hover:not(:disabled) {
-    background: linear-gradient(to right, #EA4335, #FF5252);
     box-shadow: 0 6px 12px rgba(234, 67, 53, 0.2);
 }
 
 .dark-mode #start-stop-btn.stop:hover:not(:disabled) {
-    background: linear-gradient(to right, #F28B82, #FF9E80);
     box-shadow: 0 6px 12px rgba(242, 139, 130, 0.2);
 }
 
 /* Gallery Button */
 .gallery-btn {
-    background: var(--primary-light);
+    background: var(--button-gradient-light);
     color: white;
+    border-radius: 30px;
 }
 
 .dark-mode .gallery-btn {
-    background: var(--primary-dark);
-    color: var(--background-dark);
+    background: var(--button-gradient-dark);
+    color: white;
 }
 
 .gallery-btn:hover {
-    background: linear-gradient(to right, #4285F4, #1A73E8);
     transform: translateY(-2px);
     box-shadow: 0 6px 12px rgba(66, 133, 244, 0.2);
+    filter: brightness(1.05);
 }
 
 .dark-mode .gallery-btn:hover {
-    background: linear-gradient(to right, #8AB4F8, #669DF6);
     box-shadow: 0 6px 12px rgba(138, 180, 248, 0.2);
+    filter: brightness(1.05);
 }
 
 /* Close Button */
@@ -698,6 +830,10 @@ button:disabled {
     transform: translateY(-20px);
     align-items: center;
     gap: 12px;
+}
+
+.light-mode #emailNotification:not(.error) {
+    color: var(--on-background-light); /* Use a dark color for light background */
 }
 
 .dark-mode #emailNotification {
@@ -843,8 +979,8 @@ button:disabled {
 .snapshot a {
     display: inline-block;
     padding: 8px 16px;
-    border-radius: var(--border-radius-sm);
-    background: var(--primary-gradient-light);
+    border-radius: 30px;
+    background: var(--button-gradient-light);
     color: white;
     text-decoration: none;
     font-size: 0.9rem;
@@ -855,17 +991,19 @@ button:disabled {
 }
 
 .dark-mode .snapshot a {
-    background: var(--primary-gradient-dark);
-    color: var(--background-dark);
+    background: var(--button-gradient-dark);
+    color: white;
 }
 
 .snapshot a:hover {
     transform: translateY(-2px);
     box-shadow: 0 4px 8px rgba(66, 133, 244, 0.3);
+    filter: brightness(1.05);
 }
 
 .dark-mode .snapshot a:hover {
     box-shadow: 0 4px 8px rgba(138, 180, 248, 0.3);
+    filter: brightness(1.05);
 }
 
 /* Animation */
@@ -903,6 +1041,7 @@ button:disabled {
 }
 
 .dark-mode ::-webkit-scrollbar-thumb:hover {
+    display:none;
     background-color: rgba(255, 255, 255, 0.3);
 }
 
@@ -911,7 +1050,7 @@ button:disabled {
     .app-container {
         flex-direction: column;
     }
-    
+   
     .right-column {
         width: 100%;
     }
@@ -921,7 +1060,7 @@ button:disabled {
     }
     
     #status-logs {
-        max-height: 150px;
+        max-height: 200px;
     }
 }
 
@@ -931,7 +1070,7 @@ button:disabled {
     }
     
     .navbar {
-        width: 100%;
+        width: calc(100% - 48px);
         margin: 0 0 24px;
         padding: 0 16px;
     }
@@ -967,7 +1106,9 @@ button:disabled {
     }
     
     .nav-title {
-        font-size: 1rem;
+        text-emphasis: bold;
+        font-size: 3rem;
+        font-weight: bold;
     }
     
     .model-select-wrapper label {

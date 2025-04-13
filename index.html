@@ -42,7 +42,10 @@
                                     <option value="yolov11n">YOLOv11n</option>
                                 </select>
                             </div>
-                            <div id="detection-status">Status: Idle</div>
+                            <div id="detection-status">
+                                <div class="status-indicator"></div>
+                                <span class="status-text">Status: Idle</span>
+                            </div>
                         </div>
                         <div class="control-group">
                             <button id="start-stop-btn" class="start btn-effect" disabled>
@@ -101,7 +104,7 @@
 
     <script>
         // EmailJS init and all the original script content remains unchanged
-        emailjs.init("<APIKEY>"); // Replace with your actual EmailJS public key
+        emailjs.init("{API_KEY}");
 
         // --- DOM Element References ---
         const video = document.getElementById('video');
@@ -111,6 +114,7 @@
         const statusLogs = document.getElementById('status-logs');
         const modelSelect = document.getElementById('model-select');
         const detectionStatusDiv = document.getElementById('detection-status');
+        const detectionStatusText = document.querySelector('.status-text');
         const snapshotGallery = document.getElementById('snapshot-gallery');
         const noSnapshotsMsg = document.getElementById('no-snapshots');
         const videoContainer = document.getElementById('video-container');
@@ -137,9 +141,9 @@
         // --- Snapshot & Email Parameters ---
         const SNAPSHOT_MIN_INTERVAL_MS = 1 * 60 * 1000; // 1 minute
         const EMAIL_COOLDOWN_MS = 10 * 60 * 1000; // 10 minutes
-        const IMGBB_API_KEY = "<API KEY>"; // WARNING: Insecure
-        const EMAILJS_SERVICE_ID = "<API KEY>"; // WARNING: Insecure
-        const EMAILJS_TEMPLATE_ID = "<API KEY>"; // WARNING: Insecure
+        const IMGBB_API_KEY = "{API_KEY}"; // WARNING: Insecure
+        const EMAILJS_SERVICE_ID = "{API_KEY}"; // WARNING: Insecure
+        const EMAILJS_TEMPLATE_ID = "{API_KEY}"; // WARNING: Insecure
 
         // --- State Variables ---
         let currentModel = null;
@@ -244,8 +248,7 @@
             console.log(`Loading model: ${name}`);
             updateLoadingProgress('Preparing...');
             
-            detectionStatusDiv.textContent = 'Status: Idle';
-            detectionStatusDiv.className = 'detection-status';
+            updateDetectionStatus(false, false, true); // Reset status indicator to Idle
             isDetecting = false; lastSnapshotTime = 0; lastDetectedClassesSet = null;
             startStopBtn.disabled = true; modelSelect.disabled = true;
 
@@ -261,7 +264,20 @@
             updateLoadingProgress('Initializing Backend...');
             await new Promise(resolve => setTimeout(resolve, 50));
             await tf.ready();
-            try { await tf.setBackend('webgl'); await tf.ready(); console.log("Using WebGL backend."); }
+            try { 
+                await tf.setBackend('webgl'); 
+                await tf.ready(); 
+                console.log("Using WebGL backend."); 
+                const webglFlags = {
+                        // 'WEBGL_FORCE_F16_TEXTURES': true,
+                        'WEBGL_PACK_BINARY_OPERATIONS': true, 
+                        'WEBGL_PACK_CLIP': false,
+                        'WEBGL_PACK_BATCHNORMALIZATION': true,
+                        'WEBGL_RENDER_FLOAT32_ENABLED': true,
+                       
+                }    
+                tf.env().setFlags(webglFlags);   
+            }
             catch (e) {
                 console.warn("WebGL backend failed, falling back to CPU.", e);
                 try { await tf.setBackend('cpu'); await tf.ready(); console.log("Using CPU backend."); }
@@ -352,9 +368,68 @@
             modelSelect.disabled = false;
         }
 
+        /** Updates the detection status indicator element's text and style. */
+        function updateDetectionStatus(isTargetDetected, noObjectsDetected, reset = false) {
+            if (reset) {
+                detectionStatusText.textContent = 'Status: Idle';
+                detectionStatusDiv.className = '';
+                return;
+            }
+            if (isTargetDetected) {
+                detectionStatusText.textContent = 'Status: Insect Detected!';
+                detectionStatusDiv.className = 'target-detected';
+            }
+            else if (!noObjectsDetected) {
+                detectionStatusText.textContent = 'Status: Non-Target Object Detected';
+                detectionStatusDiv.className = 'non-target-detected';
+            }
+            else {
+                detectionStatusText.textContent = 'Status: No Objects Detected';
+                detectionStatusDiv.className = 'no-objects';
+            }
+        }
+
+        /** Displays a temporary notification message (e.g., for email status). */
+        function showNotification(message, isError = false) {
+            const notificationEl = emailNotificationDiv;
+            const iconEl = notificationEl.querySelector('.notification-icon');
+            const textEl = notificationEl.querySelector('.notification-text');
+            
+            // Update content
+            textEl.textContent = message;
+            
+            // Update icon and class
+            if (isError) {
+                notificationEl.classList.add('error');
+                iconEl.textContent = 'error';
+                iconEl.classList.remove('success-icon');
+                iconEl.classList.add('error-icon');
+            } else {
+                notificationEl.classList.remove('error');
+                iconEl.textContent = 'check_circle';
+                iconEl.classList.remove('error-icon');
+                iconEl.classList.add('success-icon');
+            }
+            
+            // Show notification with animation
+            notificationEl.classList.remove('slide-out');
+            notificationEl.classList.add('slide-in');
+            notificationEl.style.display = 'flex';
+            
+            // Hide after delay
+            setTimeout(() => {
+                notificationEl.classList.remove('slide-in');
+                notificationEl.classList.add('slide-out');
+                
+                // After animation completes, hide element
+                setTimeout(() => {
+                    notificationEl.style.display = 'none';
+                }, 500);
+            }, 3000);
+        }
+
         /**
          * Processes the raw output tensor from the YOLO model.
-         * **REVISED** to normalize coordinates after conversion.
          */
         async function processDetections(predictionsTensor) {
             const finalBoxes = []; const finalScores = []; const finalClassIds = [];
@@ -454,7 +529,6 @@
             }
         }
 
-
         /** Helper function to compare two Sets for equality. */
         function areSetsEqual(setA, setB) {
             if (!setA || !setB) return false;
@@ -467,6 +541,7 @@
         async function detectFrame() {
              if (!isDetectionRunning || !currentModel || video.paused || video.ended || video.readyState < 3) {
                 console.log("Stopping detection frame processing (loop stopped, no model, or video issue).");
+                // updateDetectionStatus(false, false, false);
                 stopDetectionLoop(); return;
             }
             if (isDetecting) { rafId = requestAnimationFrame(detectFrame); return; }
@@ -520,6 +595,7 @@
             } catch (error) {
                 console.error("Error during detection frame:", error);
                 addStatusLog("Detection Error. Stopping.");
+                // updateDetectionStatus(false, false, false);
                 stopDetectionLoop();
             } finally {
                  if (predictions) {
@@ -531,11 +607,11 @@
                      rafId = requestAnimationFrame(detectFrame);
                  } else if (isDetectionRunning) {
                      console.log("Video stopped/paused/ended unexpectedly. Stopping loop.");
+                    //  updateDetectionStatus(false, false, true); // Add this line to ensure status is "Idle"
                      stopDetectionLoop();
                  }
             }
         }
-
 
         /** Draws bounding boxes and labels on the canvas overlay. */
         function drawBoundingBoxes(boxes, scores, classIds) {
@@ -581,66 +657,6 @@
                     // console.warn(`Skipping drawing box ${i} due to zero/negative dimensions: w=${width}, h=${height}`);
                 }
             });
-        }
-
-        /** Updates the detection status indicator element's text and style. */
-        function updateDetectionStatus(isTargetDetected, noObjectsDetected, reset = false) {
-            if (reset) {
-                detectionStatusDiv.textContent = 'Status: Idle';
-                detectionStatusDiv.className = 'detection-status';
-                return;
-            }
-            if (isTargetDetected) {
-                detectionStatusDiv.textContent = 'Status: Target Insect Detected!';
-                detectionStatusDiv.className = 'detection-status target-detected';
-            }
-            else if (!noObjectsDetected) {
-                 detectionStatusDiv.textContent = 'Status: Non-Target Object Detected';
-                 detectionStatusDiv.className = 'detection-status non-target-detected';
-            }
-            else {
-                detectionStatusDiv.textContent = 'Status: No Objects Detected';
-                detectionStatusDiv.className = 'detection-status no-objects';
-            }
-        }
-
-        /** Displays a temporary notification message (e.g., for email status). */
-        function showNotification(message, isError = false) {
-            const notificationEl = emailNotificationDiv;
-            const iconEl = notificationEl.querySelector('.notification-icon');
-            const textEl = notificationEl.querySelector('.notification-text');
-            
-            // Update content
-            textEl.textContent = message;
-            
-            // Update icon and class
-            if (isError) {
-                notificationEl.classList.add('error');
-                iconEl.textContent = 'error';
-                iconEl.classList.remove('success-icon');
-                iconEl.classList.add('error-icon');
-            } else {
-                notificationEl.classList.remove('error');
-                iconEl.textContent = 'check_circle';
-                iconEl.classList.remove('error-icon');
-                iconEl.classList.add('success-icon');
-            }
-            
-            // Show notification with animation
-            notificationEl.classList.remove('slide-out');
-            notificationEl.classList.add('slide-in');
-            notificationEl.style.display = 'flex';
-            
-            // Hide after delay
-            setTimeout(() => {
-                notificationEl.classList.remove('slide-in');
-                notificationEl.classList.add('slide-out');
-                
-                // After animation completes, hide element
-                setTimeout(() => {
-                    notificationEl.style.display = 'none';
-                }, 500);
-            }, 3000);
         }
 
         /** Takes snapshot, uploads, sends email. */
@@ -707,7 +723,7 @@
                     console.log('Image uploaded successfully:', imageUrl);
                     console.log("Sending email via EmailJS...");
                     await emailjs.send( EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
-                            to_email: "<YOUR MAIL>", // ** HARDCODED RECIPIENT **
+                            to_email: "pinakesh.chatto2016@gmail.com", // ** HARDCODED RECIPIENT **
                             message: `${reason}. Snapshot captured at ${new Date().toLocaleString()}. View image: ${imageUrl}`,
                             image_url: imageUrl
                     });
@@ -722,7 +738,6 @@
                 showNotification(`Error: ${error.message || 'Failed to send snapshot email.'}`, true);
             }
         }
-
 
         // --- Event Listeners Setup ---
         modelSelect.addEventListener('change', async (event) => {
